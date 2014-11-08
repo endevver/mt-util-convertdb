@@ -47,14 +47,14 @@ has metacolumns => (
 sub _build_metacolumns {
     my $self = shift;
     require MT::Meta;
-    my @metacolumns = MT::Meta->metadata_by_class($self->class);
-    @metacolumns ? \@metacolumns : undef;
+    return [ MT::Meta->metadata_by_class($self->class) ];
 }
 
 sub _trigger_class {
     my $self = shift;
     my $class = shift;
-    $self->clear_metacolumns unless defined $self->metacolumns;
+    $self->clear_metacolumns unless defined($self->metacolumns)
+                                 && @{ $self->metacolumns };
 }
 
 sub _build_class {
@@ -184,7 +184,9 @@ sub remove_all {
     my $count = $class->count(@_);
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info(sprintf('Removing %d %s objects (%s)', $count, $class, ref($self) ));
-    $self->class->remove_all() if $count;
+    undef $class->properties->{driver};
+    undef $class->meta_pkg->properties->{driver} if $class->meta_pkg;
+    $class->remove_all() if $count;
 }
 
 # sub load       { shift->class->load(@_) }
@@ -194,6 +196,8 @@ sub load       {
     my $count = $class->count(@_);
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info(sprintf('Loading %d %s objects (%s)', $count, $class, ref($self) ));
+    undef $class->properties->{driver};
+    undef $class->meta_pkg->properties->{driver} if $class->meta_pkg;
     $self->class->load(@_)
 }
 
@@ -204,6 +208,8 @@ sub load_iter  {
     my $count = $class->count(@_);
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info(sprintf('Getting iter for %d %s objects (%s)', $count, $class, ref($self) ));
+    undef $class->properties->{driver};
+    undef $class->meta_pkg->properties->{driver} if $class->meta_pkg;
     my $iter = $self->class->load_iter(@_)
 }
 
@@ -240,6 +246,9 @@ sub save {
     ###l4p $l4p->info(sprintf( 'Saving %s%s', $self->class,
     ###l4p     ( $obj->has_column('id') ? ' ID '.$obj->id : '.' )
     ###l4p ));
+
+    undef $obj->properties->{driver};
+    undef $obj->meta_pkg->properties->{driver} if $obj->meta_pkg;
 
     unless ($obj->save) {
         $l4p->error("Failed to save record for class ".$self->class
@@ -284,11 +293,14 @@ sub post_load_meta {
 
 sub load_meta {
     my $self = shift;
-    my ( $classobj, $obj ) = @_;
+    my ( $obj ) = @_;
     ###l4p $l4p ||= get_logger();
     # ##l4p $l4p->warn('load_meta is unimplemented');    ### FIXME load_meta is unimplemented
 
-    my $meta;
+    my $meta = $obj->meta || {};
+    $obj->meta( $_, $meta->{$_} ) foreach keys %$meta;
+
+    return $meta;
     # if ( $obj->has_meta ) {
     #     $obj->meta_obj->refresh();
     #     $obj->init_meta();
@@ -321,7 +333,7 @@ sub load_meta {
 
 sub save_meta {
     my $self = shift;
-    my ( $classobj, $obj, $meta ) = @_;
+    my ( $obj, $meta ) = @_;
     ###l4p $l4p ||= get_logger(); $l4p->trace(1);
     # ##l4p $l4p->warn('save_meta is unimplemented');    ### FIXME save_meta is unimplemented
     return $meta;

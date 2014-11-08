@@ -42,14 +42,13 @@ sub run {
         ### First pass to load/save objects
         ###
         foreach my $classobj ( @$class_objs ) {
-            # p($classobj->class->properties);
 
             $cfgmgr->newdb->remove_all( $classobj );
 
             my $iter = $cfgmgr->olddb->load_iter( $classobj );
 
             while (my $obj = $iter->()) {
-
+                $cfgmgr->olddb->load_meta( $classobj, $obj );
                 $cfgmgr->newdb->save( $classobj, $obj );
             }
             $cfgmgr->post_load( $classobj );
@@ -58,22 +57,23 @@ sub run {
 
         ####l4p $l4mt->info('NOW STARTING SECOND PASS FOR METADATA MIGRATION');
 
-        ###
-        ### Second pass to load/save object metadata
-        ###
-        foreach my $classobj ( @$class_objs ) {
-            next unless $classobj->has_metacolumns;
-            p($classobj->metacolumns);
-            my $iter = $cfgmgr->olddb->load_iter( $classobj );
-
-            while (my $obj = $iter->()) {
-                next unless $obj->has_meta;
-                my $meta = $cfgmgr->olddb->load_meta( $classobj, $obj );
-                $cfgmgr->newdb->save_meta( $classobj, $obj, $meta );
-            }
-            $cfgmgr->post_load_meta( $classobj );
-        }
-        $cfgmgr->post_load_meta( $classmgr );
+        # ###
+        # ### Second pass to load/save object metadata
+        # ###
+        # foreach my $classobj ( @$class_objs ) {
+        #     next unless $classobj->has_metacolumns;
+        #     p($classobj->class->meta_pkg->properties);
+        #     # p($classobj->metacolumns);
+        #     my $iter = $cfgmgr->olddb->load_iter( $classobj );
+        #
+        #     while (my $obj = $iter->()) {
+        #         next unless $obj->has_meta;
+        #         my $meta = $cfgmgr->olddb->load_meta( $classobj, $obj );
+        #         $cfgmgr->newdb->save_meta( $classobj, $obj, $meta );
+        #     }
+        #     $cfgmgr->post_load_meta( $classobj );
+        # }
+        # $cfgmgr->post_load_meta( $classmgr );
 
         $l4p->info("Done copying data! All went well.");
     }
