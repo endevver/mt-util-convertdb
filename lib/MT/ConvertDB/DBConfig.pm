@@ -237,8 +237,8 @@ sub post_load_meta  { shift; shift->post_load_meta() }
 sub object_summary  { p(shift->obj_summary)          }
 
 sub save_meta       {
-    my $self = shift;
-    return shift->save_meta(@_) unless $self->read_only;
+    my ($self, $classobj, $obj) = @_;
+    return $classobj->save_meta($obj) unless $self->read_only;
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info(sprintf('FAKE saving metadata for %s%s',
     ###l4p     $classobj->class,
