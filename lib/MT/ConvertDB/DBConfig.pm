@@ -17,10 +17,10 @@ has app_class => (
 );
 
 has file => (
-    is      => 'ro',
-    coerce  => quote_sub(q( path($_[0])->absolute )),
-    isa     => quote_sub(q( my ($v) = @_; defined($v) && Scalar::Util::blessed($v) && $v->isa('Path::Tiny') && $v->is_file or die "file is not a valid config file path: ".$v )),
-    trigger => 1,
+    is        => 'ro',
+    coerce    => quote_sub(q( path($_[0])->absolute )),
+    isa       => quote_sub(q( my ($v) = @_; defined($v) && Scalar::Util::blessed($v) && $v->isa('Path::Tiny') && $v->is_file or die "file is not a valid config file path: ".$v )),
+    predicate => 1,
 );
 
 has app => (
@@ -41,32 +41,40 @@ has obj_summary => (
     default => sub { {} },
 );
 
-sub _trigger_read_only {
-    my $self = shift;
-    # my $val  = shift;
-    ###l4p $l4p->info(sprintf('%s configured as %s', $self->driver->{dsn},
-    ###l4p                     $self->read_only ? 'READ ONLY' : 'WRITEABLE' )) if $self->has_driver;
+sub BUILDARGS {
+    my ( $class, @args ) = @_;
+    unshift @args, "file" if @args % 2 == 1;
+    ###l4p $l4p ||= get_logger();
+    ###l4p $l4p->info('########## Instantiation for config '.$_[1] );
+    return { @args };
 }
 
-sub _trigger_file {
+sub BUILD {
     my $self = shift;
-    ###l4p $l4p ||= get_logger(); $l4p->trace(1);
-    ###l4p $l4p->info('Initializing '.ref($self).' with config file: '.$_[0]);
+    ###l4p $l4p ||= get_logger();
     $self->app;
     $self->driver;
     $self->finish_init;
-    ###l4p $l4p->info(sprintf('%s configured as %s', $self->driver->{dsn},
-    ###l4p                     $self->read_only ? 'READ ONLY' : 'WRITEABLE' )) if $self->has_read_only;
+    ###l4p $l4p->info('INITIALIZATION COMPLETE for '.ref($self).': '.$self->label);
+    $self;
+}
+
+sub _trigger_read_only {
+    my $self = shift;
+    my $val  = shift;
+    ###l4p $l4p->info(sprintf('Setting %s to %s', $self->driver->{dsn},
+    ###l4p     $val ? 'READ ONLY' : 'WRITEABLE' )) if $val != $self->read_only;
 }
 
 sub _build_app {
     my $self = shift;
-    ###l4p $l4p ||= get_logger(); $l4p->trace();
+    ###l4p $l4p ||= get_logger();
     my $app_class = $self->app_class;
     my $cfg_file  = $self->file->absolute;
-    ###l4p $l4p->info("Constructing new $app_class app using config from $cfg_file");
+    ###l4p $l4p->info("Constructing new app: $app_class");
     ###l4p $l4p->info('A previous app existed: '.$MT::mt_inst) if $MT::mt_inst;
     ###l4p $l4p->info('A previous config existed: '.$MT::ConfigMgr::cfg) if $MT::ConfigMgr::cfg;
+    ### FIXME Previous app isa MT, not MT::App::CMS
 
     my $mt = try {
         local $SIG{__WARN__} = sub {};
@@ -237,43 +245,30 @@ sub use {
     $self;
 }
 
-# sub load        { shift; shift->load(@_)       }
-sub load {
-    my $self     = shift;
-    my $classobj = shift;
-    ###l4p $l4p ||= get_logger(); $l4p->debug("Forwarding to $classobj->load");
-    $classobj->load(@_)
-}
+sub load            { shift; shift->load(@_)         }
+sub load_iter       { shift; shift->load_iter(@_)    }
+sub load_meta       { shift; shift->load_meta(@_)    }
+sub post_load       { shift; shift->post_load()      }
+sub post_load_meta  { shift; shift->post_load_meta() }
+sub object_summary  { p(shift->obj_summary)          }
 
-# sub load_iter   { shift; shift->load_iter(@_)  }
-sub load_iter {
-    my $self     = shift;
-    my $classobj = shift;
-    ###l4p $l4p ||= get_logger(); $l4p->debug("Forwarding to $classobj->load_iter");
-    $classobj->load_iter(@_)
-}
-
-sub load_meta {
+sub save_meta       {
     my $self = shift;
-    my ( $classobj, $obj ) = @_;
+    return shift->save_meta(@_) unless $self->read_only;
     ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->debug(sprintf( 'Forwarding to %s->load_meta for %s%s',
-    ###l4p     $classobj, $classobj->class,
-    ###l4p     ( $obj->has_column('id') ? ' ID '.$obj->id : '.' ),
-    ###l4p ));
-    $classobj->load_meta( $obj );
-}
-
-sub save_meta {
-    my $self = shift;
-    my ( $classobj, $obj, $meta ) = @_;
-    ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->debug(sprintf( 'Forwarding meta for %s%s to %s->save_meta ',
+    ###l4p $l4p->info(sprintf('FAKE saving metadata for %s%s',
     ###l4p     $classobj->class,
-    ###l4p     ( $obj->has_column('id') ? ' ID '.$obj->id : '.' ),
-    ###l4p     $classobj
-    ###l4p ), $meta ? l4mtdump($meta) : ());
-    $classobj->save_meta( $obj, $meta );
+    ###l4p     ( $obj->has_column('id') ? ' ID '.$obj->id : '.' ) ));
+}
+
+sub remove_all  {
+    my $self     = shift;
+    my $classobj = shift;
+    return $classobj->remove_all() unless $self->read_only;
+    ###l4p $l4p ||= get_logger();
+    my $class = $classobj->class;
+    my $count = $class->count(@_);
+    ###l4p $l4p->info(sprintf('FAKE Removing %d %s objects (%s)', $count, $class, ref($classobj) ));
 }
 
 before save => sub {
@@ -305,37 +300,14 @@ after save => sub {
     # ##l4p $l4p ||= get_logger(); $l4p->warn('after save is unimplemented');    ### FIXME after save is unimplemented
 };
 
-sub remove_all  {
-    my $self     = shift;
-    my $classobj = shift;
-    ###l4p $l4p ||= get_logger();
-    return $classobj->remove_all() unless $self->read_only;
-
-    my $class = $classobj->class;
-    my $count = $class->count(@_);
-    ###l4p $l4p->info(sprintf('FAKE Removing %d %s objects (%s)', $count, $class, ref($classobj) ));
-}
-
-sub object_summary {
+sub label {
     my $self = shift;
-    ###l4p $l4p ||= get_logger();
-    p($self->obj_summary);
-}
-
-sub post_load {
-    my $self     = shift;
-    my $classobj = shift;
-    ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->debug("Forwarding to $classobj->post_load");
-    $classobj->post_load();
-}
-
-sub post_load_meta {
-    my $self     = shift;
-    my $classobj = shift;
-    ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->debug("Forwarding to $classobj->post_load_meta");
-    $classobj->post_load_meta();
+    join(' ', '[',
+              ($self->has_file      ? $self->file->basename : ()),
+              ($self->has_driver    ? $self->driver->{dsn}  : ()),
+              ($self->read_only     ? 'READ ONLY' : 'WRITEABLE' ),
+              ']'
+    );
 }
 
 1;

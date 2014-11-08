@@ -14,8 +14,7 @@ has read_only => (
 has old_config => (
     is        => 'lazy',
     init_arg  => 'old',
-    coerce    => quote_sub(q( MT::ConvertDB::DBConfig->new( file => $_[0] ); )),
-    trigger   => 1,
+    coerce    => quote_sub(q( MT::ConvertDB::DBConfig->new( $_[0] ); )),
     predicate => 1,
 );
 
@@ -23,8 +22,7 @@ has new_config => (
     is        => 'ro',
     lazy      => 1,
     init_arg  => 'new',
-    coerce    => quote_sub(q( MT::ConvertDB::DBConfig->new( file => $_[0] ); )),
-    trigger   => 1,
+    coerce    => quote_sub(q( MT::ConvertDB::DBConfig->new( $_[0] ); )),
     required  => 1,
     predicate => 1,
 );
@@ -33,20 +31,18 @@ sub _build_old_config { './mt-config.cgi' }
 
 sub _trigger_read_only {
     my $self = shift;
-    my $val = shift;
-    $self->new_config->read_only( $val );
+    $self->new_config->read_only(@_) if $self->has_new_config;
 }
 
-sub _trigger_new_config {
+sub BUILD {
     my $self = shift;
     ###l4p $l4p ||= get_logger();
-    $self->check_configs() if $self->has_old_config;
+    $self->_trigger_read_only( $self->read_only );
+    $self->check_configs();
+    ###l4p $l4p->info('INITIALIZATION COMPLETE for '.ref($self));
+    $self;
 }
 
-sub _trigger_old_config {
-    my $self = shift;
-    ###l4p $l4p ||= get_logger();
-    $self->check_configs() if $self->has_new_config;
 }
 
 sub check_configs {
