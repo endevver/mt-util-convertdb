@@ -73,56 +73,25 @@ sub _build_class_hierarchy {
     my $self = shift;
     ###l4p $l4p ||= get_logger(); $l4p->trace(1);
 
-    my $types = $self->object_types;
-
+    my $types     = $self->object_types;
     my $class_map = {};
+
     foreach my $type ( @$types ) {
         my $class = MT->model($type);
         next if $class_map->{$class}{processed}++;
-        my $props = $class->properties;
-        $l4p->info("Mapping $class");
+        ###l4p $l4p->debug("Mapping $class");
 
-        unless ($props->{child_classes}) {
-            $class_map->{$class}{children} = [];
-            $class_map->{$class}{counts}{children} = 0;
-            $class_map->{$class}{parents}  ||= {};
-            $class_map->{$class}{counts}{parents} = 0;
-            $class_map->{$class}{processed} = 1;
-            next;
-        }
-
-        $class_map->{$class}{parents}  ||= {};
-        $class_map->{$class}{children} ||= {};
-
-        if (ref($props->{child_classes}) eq 'ARRAY') {
-            $class_map->{$class}{children}{$_} = 1 for @{$props->{child_classes}};
-        }
-        elsif (ref($props->{child_classes}) eq 'HASH') {
-            $class_map->{$class}{children}{$_} = 1 for keys %{$props->{child_classes}};
-        }
-        else {
-            warn "child_classes not an array or hash ref";
-            p($props);
-            p($props->{child_classes});
-            $class_map->{$class}{processed} = 1;
-            next;
-        }
-        $class_map->{$class}{children}         = [ keys %{$class_map->{$class}{children}} ];
-        $class_map->{$class}{counts}{children} = scalar @{$class_map->{$class}{children}};
-
-        foreach my $child ( @{$class_map->{$class}{children}} ) {
-            $class_map->{$child}{parents} ||= {};
-            $class_map->{$child}{parents}{$class} = 1;
-        }
+        my @kids = $self->_parse_child_classes( $class );
+        $class_map->{$class}{children}       = [ @kids ];
+        $class_map->{$class}{parents}      ||= [];
+        push( @{ $class_map->{$_}{parents} ||= [] }, $class ) for @kids;
     }
 
-    foreach my $class ( keys %$class_map ) {
-        $class_map->{$class}{parents}         = [ keys %{$class_map->{$class}{parents}} ];
-        $class_map->{$class}{counts}{parents} = scalar @{$class_map->{$class}{parents}};
-    }
+    # De-dupe parents
+    @{$_->{parents}}   = List::MoreUtils::uniq( @{$_->{parents}} )
+        for values %$class_map;
 
     ###l4p $l4p->debug('Class map: '.p($class_map));
-
     return $class_map;
 
     # my @order = sort { $a->[1]{counts}{parents} <=> $b->[1]{counts}{parents} }
@@ -130,6 +99,25 @@ sub _build_class_hierarchy {
     #
     # p(@order);
     # return \@order;
+}
+
+sub _parse_child_classes {
+    my ( $self, $class ) = @_;
+    require List::MoreUtils;
+    my $props_children = $class->properties->{child_classes};
+    return unless $props_children;
+
+    my $reftype        = ref($props_children);
+
+    if ( grep { $_ eq $reftype } qw( HASH ARRAY ) ) {
+        return List::MoreUtils::uniq(
+            $reftype eq 'HASH' ? keys %{$props_children} : @{$props_children}
+        );
+    }
+
+    $l4p->warn( "Unrecognized child_classes reference $reftype for $class: ",
+                l4mtdump($props_children) );
+    return;
 }
 
 my %class_objects_generated;
