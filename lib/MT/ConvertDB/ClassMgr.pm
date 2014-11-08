@@ -1,6 +1,6 @@
 package MT::ConvertDB::ClassMgr;
 
-use MT::ConvertDB::Base;
+use MT::ConvertDB::ToolSet;
 use vars qw( $l4p );
 
 has object_types => (
@@ -24,8 +24,9 @@ has object_keys => (
 );
 
 has class => (
-    is => 'lazy',
-    isa => quote_sub(q( defined($_[0]) or die "class not defined";  )),
+    is      => 'lazy',
+    isa     => quote_sub(q( defined($_[0]) or die "class not defined";  )),
+    trigger => 1,
 );
 
 has type => (
@@ -36,6 +37,25 @@ has type => (
 has class_hierarchy => (
     is => 'lazy',
 );
+
+has metacolumns => (
+    is        => 'lazy',
+    predicate => 1,
+    clearer   => 1,
+);
+
+sub _build_metacolumns {
+    my $self = shift;
+    require MT::Meta;
+    my @metacolumns = MT::Meta->metadata_by_class($self->class);
+    @metacolumns ? \@metacolumns : undef;
+}
+
+sub _trigger_class {
+    my $self = shift;
+    my $class = shift;
+    $self->clear_metacolumns unless defined $self->metacolumns;
+}
 
 sub _build_class {
     my $self = shift;
@@ -51,6 +71,7 @@ sub _build_object_types {
 
 sub _build_class_hierarchy {
     my $self = shift;
+    ###l4p $l4p ||= get_logger(); $l4p->trace(1);
 
     my $types = $self->object_types;
 
@@ -100,7 +121,7 @@ sub _build_class_hierarchy {
         $class_map->{$class}{counts}{parents} = scalar @{$class_map->{$class}{parents}};
     }
 
-    p($class_map);
+    ###l4p $l4p->debug('Class map: '.p($class_map));
 
     return $class_map;
 
@@ -120,6 +141,7 @@ sub class_objects {
 
     my @objs;
     push(@objs, $self->class_object('CustomFields::Field'));
+    push(@objs, $self->class_object('MT::PluginData'));
 
     foreach my $type ( @$types ) {
         my $class = MT->model($type);
@@ -155,23 +177,43 @@ sub class_object {
     return @objs;
 }
 
-sub get_iter {
+# sub remove_all { shift->class->remove_all() }
+sub remove_all {
     my $self  = shift;
-    my $class = shift() // $self->class;
-    ###l4p $l4p ||= get_logger(); $l4p->trace(1);
-    # my $class = MT->instance->model($type);
-    ###l4p $l4p->info('Getting read iter for '.$class->count().' '.$class.' objects ('.ref($self).')');
-    # $l4p->info('Loading '.$class->count().' objects for '. $self->type);
-    my $iter  = $class->load_iter;
-    return $iter;
+    my $class = $self->class;
+    my $count = $class->count(@_);
+    ###l4p $l4p ||= get_logger();
+    ###l4p $l4p->info(sprintf('Removing %d %s objects (%s)', $count, $class, ref($self) ));
+    $self->class->remove_all() if $count;
 }
 
-sub process_object {
-    my ($self,$obj) = @_;
-    ###l4p $l4p ||= get_logger(); $l4p->trace();
-    my $defs = $obj->column_defs;
+# sub load       { shift->class->load(@_) }
+sub load       {
+    my $self  = shift;
+    my $class = $self->class;
+    my $count = $class->count(@_);
+    ###l4p $l4p ||= get_logger();
+    ###l4p $l4p->info(sprintf('Loading %d %s objects (%s)', $count, $class, ref($self) ));
+    $self->class->load(@_)
+}
 
-    $l4p->debug(sprintf( 'Processing %s%s', $self->class, ( $obj->has_column('id') ? ' ID '.$obj->id : '.' )));
+# sub load_iter  {
+sub load_iter  {
+    my $self = shift;
+    my $class = $self->class;
+    my $count = $class->count(@_);
+    ###l4p $l4p ||= get_logger();
+    ###l4p $l4p->info(sprintf('Getting iter for %d %s objects (%s)', $count, $class, ref($self) ));
+    my $iter = $self->class->load_iter(@_)
+}
+
+before save => sub {
+    my ( $self, $obj ) = @_;
+    ###l4p $l4p ||= get_logger();
+    ###l4p $l4p->debug(sprintf( 'before save for %s%s',
+    ###l4p     $self->class,
+    ###l4p     ( $obj->has_column('id') ? ' ID '.$obj->id : '.' )));
+    my $defs = $obj->column_defs;
 
     foreach my $col (keys %{$defs}) {
         my $def = $defs->{$col};
@@ -190,31 +232,33 @@ sub process_object {
             }
         }
     }
+};
 
+sub save {
+    my ( $self, $obj ) = @_;
+    ###l4p $l4p ||= get_logger();
+    ###l4p $l4p->info(sprintf( 'Saving %s%s', $self->class,
+    ###l4p     ( $obj->has_column('id') ? ' ID '.$obj->id : '.' )
+    ###l4p ));
 
-    if ( $obj->has_meta ) {
-        require MT::Meta;
-        my @metacolumns = MT::Meta->metadata_by_class(ref($obj));
-        my %data = map { my $v = CustomFields::Util::get_meta($obj,$_); defined($v) ? ($_ => $v) : () } map { $_->{name} } @metacolumns;
-        p(%data) if keys %data;
-        # $obj->meta_obj->load_objects();
-        # p($obj);
-        # $l4p->info()); # for map { $_->{name} } @metacolumns;
-        # $l4p->info(ref($obj).' object has meta');
-        # $obj->inflate;
-        # p( $obj->properties);
+    unless ($obj->save) {
+        $l4p->error("Failed to save record for class ".$self->class
+                     . ": " . ($obj->errstr||'UNKNOWN ERROR'));
+        $l4p->error('Object: '.p($obj));
+        exit 1;
     }
-    # if ( $obj->has_summary ) {
-    #     $l4p->info(ref($obj).' object has summary');
-    #     $obj->meta_obj->load_objects;
-    #     p( $obj);
-    #     # push( @objs, $self->class_object($class->meta_pkg('summary')) );
-    #     # p($class->properties);
-    #     # push( @objs, $self->class_object($class->meta_pkg) );
-    # }
 
     return $obj;
 }
+
+after save => sub {
+    my ( $self, $obj ) = @_;
+    ###l4p $l4p ||= get_logger();
+    ###l4p $l4p->debug(sprintf( 'after save for %s%s',
+    ###l4p     $self->class,
+    ###l4p     ( $obj->has_column('id') ? ' ID '.$obj->id : '.' )));
+    # ##l4p $l4p->warn('after save is unimplemented');    ### FIXME after save is unimplemented
+};
 
 sub post_load {
     my $self = shift;
@@ -231,16 +275,87 @@ sub post_load {
     MT->instance->{cfg}->save_config();
 }
 
+sub post_load_meta {
+    my $self     = shift;
+    ###l4p $l4p ||= get_logger();
+    # ##l4p $l4p->warn('post_load_meta is unimplemented');    ### FIXME post_load_meta is unimplemented
+
+}
+
+sub load_meta {
+    my $self = shift;
+    my ( $classobj, $obj ) = @_;
+    ###l4p $l4p ||= get_logger();
+    # ##l4p $l4p->warn('load_meta is unimplemented');    ### FIXME load_meta is unimplemented
+
+    my $meta;
+    # if ( $obj->has_meta ) {
+    #     $obj->meta_obj->refresh();
+    #     $obj->init_meta();
+    #     my @objs = $obj->meta_obj->load_objects();
+    #     # p($obj);
+    #     p(@objs);
+    #     require MT::Meta;
+    #     my @metacolumns = MT::Meta->metadata_by_class(ref($obj));
+    #     my %data = map { my $v = $obj->$_ || $obj->meta($_) || CustomFields::Util::get_meta($obj,$_) || undef; ($_ => $v) } map {$_->{name} } @metacolumns;
+    #     p(%data) if keys %data;
+    # #     # $obj->meta_obj->load_objects();
+    # #     # p($obj);
+    # #     # $l4p->info()); # for map { $_->{name} } @metacolumns;
+    # #     # $l4p->info(ref($obj).' object has meta');
+    # #     # $obj->inflate;
+    # #     # p( $obj->properties);
+    # }
+    #
+    # # if ( $obj->has_summary ) {
+    # #     $l4p->info(ref($obj).' object has summary');
+    # #     $obj->meta_obj->load_objects;
+    # #     p( $obj);
+    # #     # push( @objs, $self->class_object($class->meta_pkg('summary')) );
+    # #     # p($class->properties);
+    # #     # push( @objs, $self->class_object($class->meta_pkg) );
+    # # }
+
+    return $meta;
+}
+
+sub save_meta {
+    my $self = shift;
+    my ( $classobj, $obj, $meta ) = @_;
+    ###l4p $l4p ||= get_logger(); $l4p->trace(1);
+    # ##l4p $l4p->warn('save_meta is unimplemented');    ### FIXME save_meta is unimplemented
+    return $meta;
+}
+
+#############################################################################
+
+package MT::ConvertDB::ClassMgr::CustomField::Fields;
+
+use MT::ConvertDB::Base 'Class';
+extends 'MT::ConvertDB::ClassMgr';
+use vars qw( $l4p );
+
+before save => sub {
+    my ( $self, $obj ) = @_;
+    ###l4p $l4p ||= get_logger(); $l4p->trace(1);
+
+};
+
+after save => sub {
+    my ( $self, $obj ) = @_;
+    $obj->add_meta;
+};
+
 #############################################################################
 
 package MT::ConvertDB::ClassMgr::Template;
 
-use MT::ConvertDB::Base;
+use MT::ConvertDB::Base 'Class';
 extends 'MT::ConvertDB::ClassMgr';
 use vars qw( $l4p );
 
-after process_object => sub {
-    my ($self,$obj) = @_;
+before save => sub {
+    my ( $self, $obj ) = @_;
     ###l4p $l4p ||= get_logger(); $l4p->trace(1);
 
     my $object_keys = $self->object_keys;
@@ -264,12 +379,12 @@ after process_object => sub {
 package MT::ConvertDB::ClassMgr::Author;
 
 use MT::Util;
-use MT::ConvertDB::Base;
+use MT::ConvertDB::Base 'Class';
 extends 'MT::ConvertDB::ClassMgr';
 use vars qw( $l4p );
 
-after process_object => sub  {
-    my ($self,$obj) = @_;
+before save => sub {
+    my ( $self, $obj ) = @_;
     ###l4p $l4p ||= get_logger(); $l4p->trace();
 
     my $class       = $self->class;
@@ -292,12 +407,12 @@ after process_object => sub  {
 
 package MT::ConvertDB::ClassMgr::Comment;
 
-use MT::ConvertDB::Base;
+use MT::ConvertDB::Base 'Class';
 extends 'MT::ConvertDB::ClassMgr';
 use vars qw( $l4p );
 
-after process_object => sub  {
-    my ($self,$obj) = @_;
+before save => sub {
+    my ( $self, $obj ) = @_;
     ###l4p $l4p ||= get_logger(); $l4p->trace();
 
     $obj->visible(1) unless defined $obj->visible;
@@ -307,12 +422,12 @@ after process_object => sub  {
 
 package MT::ConvertDB::ClassMgr::TBPing;
 
-use MT::ConvertDB::Base;
+use MT::ConvertDB::Base 'Class';
 extends 'MT::ConvertDB::ClassMgr';
 use vars qw( $l4p );
 
-after process_object => sub  {
-    my ($self,$obj) = @_;
+before save => sub {
+    my ( $self, $obj ) = @_;
     ###l4p $l4p ||= get_logger(); $l4p->trace();
 
     $obj->visible(1) unless defined $obj->visible;
@@ -322,12 +437,12 @@ after process_object => sub  {
 
 package MT::ConvertDB::ClassMgr::Category;
 
-use MT::ConvertDB::Base;
+use MT::ConvertDB::Base 'Class';
 extends 'MT::ConvertDB::ClassMgr';
 use vars qw( $l4p );
 
-after process_object => sub  {
-    my ($self,$obj) = @_;
+before save => sub {
+    my ( $self, $obj ) = @_;
     ###l4p $l4p ||= get_logger(); $l4p->trace();
 
     my $object_keys = $self->object_keys;
@@ -353,12 +468,12 @@ after process_object => sub  {
 
 package MT::ConvertDB::ClassMgr::Trackback;
 
-use MT::ConvertDB::Base;
+use MT::ConvertDB::Base 'Class';
 extends 'MT::ConvertDB::ClassMgr';
 use vars qw( $l4p );
 
-after process_object => sub  {
-    my ($self,$obj) = @_;
+before save => sub {
+    my ( $self, $obj ) = @_;
     ###l4p $l4p ||= get_logger(); $l4p->trace();
 
     $obj->entry_id(0) unless defined $obj->entry_id;
@@ -369,12 +484,12 @@ after process_object => sub  {
 
 package MT::ConvertDB::ClassMgr::Entry;
 
-use MT::ConvertDB::Base;
+use MT::ConvertDB::Base 'Class';
 extends 'MT::ConvertDB::ClassMgr';
 use vars qw( $l4p );
 
-after process_object => sub  {
-    my ($self,$obj) = @_;
+before save => sub {
+    my ( $self, $obj ) = @_;
     ###l4p $l4p ||= get_logger(); $l4p->trace();
 
     $obj->allow_pings(0)
@@ -387,7 +502,7 @@ after process_object => sub  {
 
 package MT::ConvertDB::ClassMgr::Generic;
 
-use MT::ConvertDB::Base;
+use MT::ConvertDB::Base 'Class';
 extends 'MT::ConvertDB::ClassMgr';
 use vars qw( $l4p );
 

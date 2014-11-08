@@ -1,14 +1,13 @@
 package MT::ConvertDB::CLI;
 
-use MT::ConvertDB::Base;
+use MT::ConvertDB::ToolSet;
+use MT::ConvertDB::ConfigMgr;
+use MT::ConvertDB::ClassMgr;
 use Getopt::Long;
-use FindBin;
-use File::Spec;
-use lib ('lib', 'extlib', "$FindBin::Bin/lib", "$FindBin::Bin/extlib");
 use vars qw( $l4p );
 
 sub run {
-
+    my $class = shift;
     GetOptions(
         "old:s"     => \my($old_config),
         "new:s"     => \my($new_config),
@@ -18,11 +17,16 @@ sub run {
     );
 
     ###l4p $l4p ||= get_logger();
+    $old_config ||= './mt-config.cgi';
+
+    die "No --new config file specified" unless $new_config;
 
     my $cfgmgr = MT::ConvertDB::ConfigMgr->new(
-        old => $old_config,
-        new => $new_config,
+                 read_only => ($save ? 0 : 1),
+                       new => $new_config,
+        $old_config ? (old => $old_config) : (),
     );
+
     my $classmgr   = MT::ConvertDB::ClassMgr->new();
     my $class_objs = $classmgr->class_objects($types);
 
@@ -32,53 +36,53 @@ sub run {
     }
 
     try {
-        local $SIG{__WARN__} = sub { print "**** WARNING: $_[0]\n" };
+        local $SIG{__WARN__} = sub { $l4p->warn($_[0]) };
 
+        ###
+        ### First pass to load/save objects
+        ###
         foreach my $classobj ( @$class_objs ) {
+            # p($classobj->class->properties);
 
-            $classobj->class->remove_all() or die "Couldn't remove all rows from new database";
+            $cfgmgr->newdb->remove_all( $classobj );
 
-            $cfgmgr->use_old_database();
-
-            my $iter = $classobj->get_iter;
+            my $iter = $cfgmgr->olddb->load_iter( $classobj );
 
             while (my $obj = $iter->()) {
-                $obj = $classobj->process_object($obj);
-                # die;
-                CORE::print '.' unless $l4p->is_debug;
-                if ( $save ) {
-                    if ($l4p->is_debug()) {
-                        $l4p->debug(sprintf( 'Saving %s%s', $classobj->type, ( $obj->has_column('id') ? ' ID '.$obj->id : '.' )));
-                    }
-                    else {
-                        CORE::print '.';
-                    }
-                    $cfgmgr->use_new_database();
-                    unless ($obj->save) {
-                        CORE::print "\n" unless $l4p->is_debug;
-                        $l4p->error("ERROR: Failed to save record for class ".$classobj->class
-                                     . ": " . ($obj->errstr||'UNKNOWN ERROR'));
-                        $l4p->error('Object: '.p($obj));
-                        exit 1;
-                    }
-                    $cfgmgr->use_old_database();
-                }
-                else {
-                    $l4p->debug(sprintf( '(NOT) Saving %s%s', $classobj->class, ( $obj->has_column('id') ? ' ID '.$obj->id : '.' )));
-                }
+
+                $cfgmgr->newdb->save( $classobj, $obj );
             }
-            $cfgmgr->use_new_database();
-            CORE::print "\n" unless $l4p->is_debug;
-            $classobj->post_load;
+            $cfgmgr->post_load( $classobj );
         }
-        $cfgmgr->use_new_database();
-        $classmgr->post_load;
+        $cfgmgr->post_load( $classmgr );
+
+        ####l4p $l4mt->info('NOW STARTING SECOND PASS FOR METADATA MIGRATION');
+
+        ###
+        ### Second pass to load/save object metadata
+        ###
+        foreach my $classobj ( @$class_objs ) {
+            next unless $classobj->has_metacolumns;
+            p($classobj->metacolumns);
+            my $iter = $cfgmgr->olddb->load_iter( $classobj );
+
+            while (my $obj = $iter->()) {
+                next unless $obj->has_meta;
+                my $meta = $cfgmgr->olddb->load_meta( $classobj, $obj );
+                $cfgmgr->newdb->save_meta( $classobj, $obj, $meta );
+            }
+            $cfgmgr->post_load_meta( $classobj );
+        }
+        $cfgmgr->post_load_meta( $classmgr );
+
         $l4p->info("Done copying data! All went well.");
     }
     catch {
         $l4p->error("An error occurred while loading data: $_");
         exit 1;
     };
+
+    print "Object counts: ".p($cfgmgr->object_summary);
 }
 
 1;
