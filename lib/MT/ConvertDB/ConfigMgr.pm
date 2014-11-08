@@ -16,6 +16,7 @@ has old_config => (
     init_arg  => 'old',
     coerce    => quote_sub(q( MT::ConvertDB::DBConfig->new( $_[0] ); )),
     predicate => 1,
+    default   => './mt-config.cgi',
 );
 
 has new_config => (
@@ -26,8 +27,6 @@ has new_config => (
     required  => 1,
     predicate => 1,
 );
-
-sub _build_old_config { './mt-config.cgi' }
 
 sub _trigger_read_only {
     my $self = shift;

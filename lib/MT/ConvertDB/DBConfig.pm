@@ -190,48 +190,32 @@ sub finish_init {
 
 sub check_plugins {
     my $self = shift;
-    ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->info('Checking loaded plugins');
+    ###l4p $l4p ||= get_logger(); $l4p->info('Checking loaded plugins');
     ###l4p if ( $l4p->is_debug ) { my $pkeys = [sort keys %MT::Plugins]; $l4p->debug(p($pkeys)); }
 
     # Check that certain plugins are loaded:
-    #   * ConfigAssistant
-    #   * CustomFields
-    #   * Others?
     %MT::Plugins or $l4p->logcroak('%MT::Plugins not loaded');
 
     exists( $MT::Plugins{$_} ) || $l4p->logcroak("$_ not loaded")
         for qw( Commercial.pack ConfigAssistant.pack );
 
     my $cpack = $MT::Plugins{'Commercial.pack'};
-    # p($cpack);
     $l4p->logcroak('CustomFields not loaded')
         unless $cpack
             && exists( $cpack->{object}{customfields} )
             && @{ $cpack->{object}{customfields} } > 0;
 
     # Check that certain plugins are NOT loaded
-    #   * LDAPTools
-    #   * Others?
     exists($MT::Plugins{LDAPTools}) && exists($MT::Plugins{LDAPTools}{object})
         and $l4p->logcroak( 'The LDAPTools plugin conflicts with this tool. '
                           . 'Please remove it from the plugins directory '
                           . 'and re-run');
-
-  # p($MT::Plugins{'GenentechThemePack'}->{object}{registry});
-    # Initialize plugins?
-    #   * CustomFields
-    #   * ConfigAssistant
-    #   * Others?
-    # require ConfigAssistant::Init;
-    # ConfigAssistant::Init::init_app($MT::Plugins{'ConfigAssistant.pack'}{object}, $self->app);
 }
 
 sub check_schema {
     my $self = shift;
-    ###l4p $l4p ||= get_logger();
+    ###l4p $l4p ||= get_logger(); $l4p->info('Loading/checking database schema');
     require MT::Upgrade;
-    ###l4p $l4p->info('Loading/checking database schema');
     MT::Upgrade->do_upgrade(Install => 1) or die MT::Upgrade->errstr;
 }
 
@@ -274,7 +258,8 @@ sub remove_all  {
 before save => sub {
     my $self               = shift;
     my ( $classobj, $obj ) = @_;
-    # ##l4p $l4p ||= get_logger(); $l4p->warn('before save is unimplemented');    ### FIXME before save is unimplemented
+    # ##l4p $l4p ||= get_logger(); $l4p->warn('before save is unimplemented');
+    ### FIXME before save is unimplemented
 
 };
 
@@ -297,7 +282,8 @@ sub save {
 after save => sub {
     my $self               = shift;
     my ( $classobj, $obj ) = @_;
-    # ##l4p $l4p ||= get_logger(); $l4p->warn('after save is unimplemented');    ### FIXME after save is unimplemented
+    # ##l4p $l4p ||= get_logger(); $l4p->warn('after save is unimplemented');
+    ### FIXME after save is unimplemented
 };
 
 sub label {
