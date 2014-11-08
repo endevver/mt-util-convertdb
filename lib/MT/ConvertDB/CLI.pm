@@ -22,9 +22,9 @@ sub run {
     die "No --new config file specified" unless $new_config;
 
     my $cfgmgr = MT::ConvertDB::ConfigMgr->new(
-                 read_only => ($save ? 0 : 1),
                        new => $new_config,
         $old_config ? (old => $old_config) : (),
+                 read_only => ($save ? 0 : 1),
     );
 
     my $classmgr   = MT::ConvertDB::ClassMgr->new();

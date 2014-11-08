@@ -14,7 +14,6 @@ has read_only => (
 has old_config => (
     is        => 'lazy',
     init_arg  => 'old',
-    isa       => quote_sub(q( my ($v) = @_; defined($v) && Scalar::Util::blessed($v) && $v->isa('MT::ConvertDB::DBConfig') or die "new_config is not valid: ".p($v) )),
     coerce    => quote_sub(q( MT::ConvertDB::DBConfig->new( file => $_[0] ); )),
     trigger   => 1,
     predicate => 1,
@@ -24,20 +23,19 @@ has new_config => (
     is        => 'ro',
     lazy      => 1,
     init_arg  => 'new',
-    isa       => quote_sub(q( my ($v) = @_; defined($v) && Scalar::Util::blessed($v) && $v->isa('MT::ConvertDB::DBConfig') or die "new_config is not valid: ".p($v) )),
     coerce    => quote_sub(q( MT::ConvertDB::DBConfig->new( file => $_[0] ); )),
     trigger   => 1,
     required  => 1,
     predicate => 1,
 );
 
+sub _build_old_config { './mt-config.cgi' }
+
 sub _trigger_read_only {
     my $self = shift;
     my $val = shift;
     $self->new_config->read_only( $val );
 }
-
-sub _build_old_config { './mt-config.cgi' }
 
 sub _trigger_new_config {
     my $self = shift;

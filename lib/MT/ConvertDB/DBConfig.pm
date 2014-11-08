@@ -87,10 +87,11 @@ sub _build_app {
     $mt->{mt_dir}     = $MT::MT_DIR;
     $mt->{config_dir} = $MT::CFG_DIR;
     $mt->{app_dir}    = $MT::APP_DIR;
-    MT->component('core')->{registry}{config_settings}{DBIRaiseError}{default}      = 1;
-    MT->component('core')->{registry}{config_settings}{DisableObjectCache}{default} = 1;
-    MT->component('core')->{registry}{config_settings}{PluginSwitch}{default}
-        = { 'LDAPTools' => 0 };
+
+    my $cs            = MT->component('core')->{registry}{config_settings};
+    $cs->{DBIRaiseError}{default}      = 1;
+    $cs->{DisableObjectCache}{default} = 1;
+    $cs->{PluginSwitch}{default}       = { 'LDAPTools' => 0 };
 
     $mt->init_callbacks();
 
@@ -109,8 +110,7 @@ sub _build_driver {
     my $self = shift;
     my $mt   = $self->app;
     my $cfg  = $mt->{cfg};
-    ###l4p $l4p ||= get_logger(); $l4p->trace();
-    ###l4p $l4p->info('Configuring objectdriver '.($mt->{cfg_file} ? 'for '.$mt->{cfg_file} : '' ));
+    ###l4p $l4p ||= get_logger();
 
     # Undef package variables which will cache any previous config's values
     require MT::Object;
@@ -136,6 +136,7 @@ sub _build_driver {
         ( $pwd   ? ( password => $pwd )   : () ),
     );
 
+    ###l4p $l4p->info('Objectdriver configured: '.$driver->{dsn});
     no warnings 'once';
     push( @MT::ObjectDriverFactory::drivers, $driver );
     return ( $MT::Object::DRIVER = $MT::ObjectDriverFactory::DRIVER = $driver );
@@ -144,8 +145,8 @@ sub _build_driver {
 sub finish_init {
     my $self = shift;
     my $mt   = $self->app;
-    ###l4p $l4p ||= get_logger(); $l4p->trace();
-    ###l4p $l4p->info('Finishing initialization with '.$self->file->absolute);
+    ###l4p $l4p ||= get_logger();
+    ###l4p $l4p->info('Finishing initialization');
     my @app_args = my(%param) = ( Config => $self->file.'' );
 
     $mt->init_lang_defaults(@app_args) or return;
@@ -181,7 +182,7 @@ sub finish_init {
 
 sub check_plugins {
     my $self = shift;
-    ###l4p $l4p ||= get_logger(); $l4p->trace();
+    ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info('Checking loaded plugins');
     ###l4p if ( $l4p->is_debug ) { my $pkeys = [sort keys %MT::Plugins]; $l4p->debug(p($pkeys)); }
 
@@ -220,9 +221,9 @@ sub check_plugins {
 
 sub check_schema {
     my $self = shift;
-    ###l4p $l4p ||= get_logger(); $l4p->trace();
+    ###l4p $l4p ||= get_logger();
     require MT::Upgrade;
-    ###l4p $l4p->info('Loading database schema into '.$self->driver->{dsn});
+    ###l4p $l4p->info('Loading/checking database schema');
     MT::Upgrade->do_upgrade(Install => 1) or die MT::Upgrade->errstr;
 }
 
@@ -302,7 +303,6 @@ after save => sub {
     my $self               = shift;
     my ( $classobj, $obj ) = @_;
     # ##l4p $l4p ||= get_logger(); $l4p->warn('after save is unimplemented');    ### FIXME after save is unimplemented
-
 };
 
 sub remove_all  {

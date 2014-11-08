@@ -234,7 +234,6 @@ sub save {
     ###l4p $l4p->info(sprintf( 'Saving %s%s', $self->class,
     ###l4p     ( $obj->has_column('id') ? ' ID '.$obj->id : '.' )
     ###l4p ));
-
     undef $obj->properties->{driver};
     undef $obj->meta_pkg->properties->{driver} if $obj->meta_pkg;
 
@@ -283,39 +282,8 @@ sub load_meta {
     my $self = shift;
     my ( $obj ) = @_;
     ###l4p $l4p ||= get_logger();
-    # ##l4p $l4p->warn('load_meta is unimplemented');    ### FIXME load_meta is unimplemented
-
     my $meta = $obj->meta || {};
     $obj->meta( $_, $meta->{$_} ) foreach keys %$meta;
-
-    return $meta;
-    # if ( $obj->has_meta ) {
-    #     $obj->meta_obj->refresh();
-    #     $obj->init_meta();
-    #     my @objs = $obj->meta_obj->load_objects();
-    #     # p($obj);
-    #     p(@objs);
-    #     require MT::Meta;
-    #     my @metacolumns = MT::Meta->metadata_by_class(ref($obj));
-    #     my %data = map { my $v = $obj->$_ || $obj->meta($_) || CustomFields::Util::get_meta($obj,$_) || undef; ($_ => $v) } map {$_->{name} } @metacolumns;
-    #     p(%data) if keys %data;
-    # #     # $obj->meta_obj->load_objects();
-    # #     # p($obj);
-    # #     # $l4p->info()); # for map { $_->{name} } @metacolumns;
-    # #     # $l4p->info(ref($obj).' object has meta');
-    # #     # $obj->inflate;
-    # #     # p( $obj->properties);
-    # }
-    #
-    # # if ( $obj->has_summary ) {
-    # #     $l4p->info(ref($obj).' object has summary');
-    # #     $obj->meta_obj->load_objects;
-    # #     p( $obj);
-    # #     # push( @objs, $self->class_object($class->meta_pkg('summary')) );
-    # #     # p($class->properties);
-    # #     # push( @objs, $self->class_object($class->meta_pkg) );
-    # # }
-
     return $meta;
 }
 
@@ -325,6 +293,25 @@ sub save_meta {
     ###l4p $l4p ||= get_logger(); $l4p->trace(1);
     # ##l4p $l4p->warn('save_meta is unimplemented');    ### FIXME save_meta is unimplemented
     return $meta;
+}
+
+sub debug_driver {
+    my $self = shift;
+    my $obj  = shift;
+    ###l4p $l4p ||= get_logger();
+    my $meta = $obj->meta;
+    if ($obj->isa('MT::Entry') or $obj->isa('MT::Blog') && $obj->id == 13 ) {
+        $l4p->info(ref($obj).' ID '.$obj->id.': ', l4mtdump({
+            driver_dsn      => $obj->driver->{dsn},
+            meta_driver_dsn => $obj->meta_pkg->driver->{dsn},
+            obj_driver      => $obj->driver,
+            metaobj_driver  => $obj->meta_pkg->driver,
+            # object        => $obj,
+            # obj_props       => $obj->properties,
+            meta            => $meta,
+            # metapkg_props   => $obj->meta_pkg->properties,
+        }));
+    }
 }
 
 #############################################################################
