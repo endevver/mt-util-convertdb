@@ -250,7 +250,7 @@ sub remove_all  {
     return $classobj->remove_all() unless $self->read_only;
     ###l4p $l4p ||= get_logger();
     my $class = $classobj->class;
-    my $count = $class->count(@_);
+    my $count = $classobj->object_count + $classobj->meta_count;
     ###l4p $l4p->info(sprintf('FAKE Removing %d %s objects (%s)', $count, $class, ref($classobj) ));
 }
 

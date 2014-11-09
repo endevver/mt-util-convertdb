@@ -3,6 +3,9 @@ package MT::ConvertDB::CLI;
 use MT::ConvertDB::ToolSet;
 use MT::ConvertDB::ConfigMgr;
 use MT::ConvertDB::ClassMgr;
+use Term::ProgressBar 2.00;
+use List::Util qw( reduce );
+
 use Getopt::Long;
 use vars qw( $l4p );
 
@@ -35,6 +38,15 @@ sub run {
         exit;
     }
 
+    my $count       = 0;
+    my $next_update = 0;
+    my $max         = reduce { $a + $b }
+                         map { $_->object_count + $_->meta_count } @$class_objs;
+    my $progress = Term::ProgressBar->new({
+        name => 'Migrated', count => $max, remove => 0
+    });
+    $progress->minor(0);
+
     try {
         local $SIG{__WARN__} = sub { $l4p->warn($_[0]) };
 
@@ -49,6 +61,10 @@ sub run {
             while (my $obj = $iter->()) {
                 my $meta = $cfgmgr->olddb->load_meta( $classobj, $obj );
                 $cfgmgr->newdb->save( $classobj, $obj, $meta );
+
+                $count += scalar(keys %$meta) + 1;
+                $next_update = $progress->update($count)
+                  if $count >= $next_update;
             }
 
             $cfgmgr->post_load( $classobj );
@@ -61,6 +77,9 @@ sub run {
         $l4p->error("An error occurred while loading data: $_");
         exit 1;
     };
+
+    $progress->update($max)
+      if $max >= $next_update;
 
     print "Object counts: ".p($cfgmgr->object_summary);
 }

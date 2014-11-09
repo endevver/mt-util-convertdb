@@ -44,6 +44,14 @@ has metacolumns => (
     clearer   => 1,
 );
 
+has object_count => (
+    is => 'rwp',
+);
+
+has meta_count => (
+    is => 'rwp',
+);
+
 sub _build_metacolumns {
     my $self = shift;
     require MT::Meta;
@@ -155,17 +163,24 @@ sub class_object {
     push( @objs, $self->class_object($_) )
         foreach @{ $class_hierarchy->{$class}{parents} };
 
+    my %param = (
+        class        => $class,
+        object_count => ($class->count() || 0),
+        meta_count => (($class->meta_pkg ? $class->meta_pkg->count() : 0)||0),
+    );
+
     (my $class_objclass = $class) =~ s{^MT}{ref($self)}e;
     my $obj = try {
-        $class_objclass->new( class => $class );
+        $class_objclass->new( %param );
     }
     catch {
         $class_objclass = ref($self).'::Generic';
-        $class_objclass->new( class => $class );
+        $class_objclass->new( %param );
     }
     finally {
         $l4p->info("Using $class_objclass for $class objects");
     };
+
     push(@objs, $obj);
     return @objs;
 }
@@ -174,7 +189,7 @@ sub class_object {
 sub remove_all {
     my $self  = shift;
     my $class = $self->class;
-    my $count = $class->count(@_);
+    my $count = $self->object_count + $self->meta_count;
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info(sprintf('Removing %d %s objects (%s)', $count, $class, ref($self) ));
     undef $class->properties->{driver};
@@ -186,7 +201,7 @@ sub remove_all {
 sub load       {
     my $self  = shift;
     my $class = $self->class;
-    my $count = $class->count(@_);
+    my $count = $self->object_count + $self->meta_count;
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info(sprintf('Loading %d %s objects (%s)', $count, $class, ref($self) ));
     undef $class->properties->{driver};
@@ -198,7 +213,7 @@ sub load       {
 sub load_iter  {
     my $self = shift;
     my $class = $self->class;
-    my $count = $class->count(@_);
+    my $count = $self->object_count + $self->meta_count;
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info(sprintf('Getting iter for %d %s objects (%s)', $count, $class, ref($self) ));
     undef $class->properties->{driver};
