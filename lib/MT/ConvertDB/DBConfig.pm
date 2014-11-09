@@ -95,7 +95,7 @@ sub _build_app {
     $mt->{config_dir} = $MT::CFG_DIR;
     $mt->{app_dir}    = $MT::APP_DIR;
 
-    my $cs            = MT->component('core')->{registry}{config_settings};
+    my $cs = MT->component('core')->{registry}{config_settings};
     $cs->{DBIRaiseError}{default}      = 1;
     $cs->{DisableObjectCache}{default} = 1;
     $cs->{PluginSwitch}{default}       = { 'LDAPTools' => 0 };

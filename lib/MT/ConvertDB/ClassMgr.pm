@@ -280,6 +280,8 @@ sub load_meta {
     my $self = shift;
     my ( $obj ) = @_;
     ###l4p $l4p ||= get_logger();
+    # undef $obj->properties->{driver};
+    # undef $obj->meta_pkg->properties->{driver} if $obj->meta_pkg;
     my $meta = $obj->meta || {};
     $obj->meta( $_, $meta->{$_} ) foreach keys %$meta;
     return $meta;

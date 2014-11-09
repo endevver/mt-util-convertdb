@@ -48,7 +48,27 @@ sub BUILD {
     *newdb = \&use_new_database;
 }
 sub object_summary  { shift->new_config->object_summary() }
-sub post_load       { shift->newdb->post_load(@_)         }
+
+sub post_load {
+    my $self     = shift;
+    my $classobj = shift;
+
+    $self->newdb->post_load( $classobj );
+
+    if ( ref($classobj) eq 'MT::ConvertDB::ClassMgr' ) {
+        # Re-load and re-save all blogs/websites to ensure all custom fields migrated
+        ###l4p $l4p ||= get_logger();
+        ###l4p $l4p->info('Reloading and resaving all blogs/websites to get full metadata');
+        my $cobjs = $classobj->class_objects([qw( blog website )]);
+        foreach my $cobj ( @$cobjs ) {
+            my $iter = $self->olddb->load_iter( $cobj );
+            while (my $obj = $iter->()) {
+                $self->olddb->load_meta( $cobj, $obj );
+                $self->newdb->save( $cobj, $obj );
+            }
+        }
+    }
+}
 
 sub use_old_database {
     ###l4p $l4p ||= get_logger(); $l4p->debug('Switching to old database');
