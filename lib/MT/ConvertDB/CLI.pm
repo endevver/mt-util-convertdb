@@ -5,43 +5,104 @@ use MT::ConvertDB::ConfigMgr;
 use MT::ConvertDB::ClassMgr;
 use Term::ProgressBar 2.00;
 use List::Util qw( reduce );
-
-use Getopt::Long;
+use MooX::Options;
 use vars qw( $l4p );
 
-sub run {
-    my $class = shift;
-    GetOptions(
-        "old:s"     => \my($old_config),
-        "new:s"     => \my($new_config),
-        "type:s@"   => \my($types),
-        'save'      => \my($save),
-        'init-only' => \my($init_only),
-    );
+option old_config => (
+    is     => 'ro',
+    format => 's',
+    doc => '',
+    longdoc => '',
+    default => './mt-config.cgi',
+);
 
+option new_config => (
+    is       => 'ro',
+    format   => 's',
+    required => 1,
+    doc => '',
+    longdoc => '',
+);
+
+option types => (
+    is     => 'ro',
+    format => 's@',
+    autosplit => ',',
+    default => sub { [] },
+    doc => '',
+    longdoc => '',
+);
+
+option save => (
+    is => 'ro',
+    doc => '',
+    longdoc => '',
+    default => 0,
+);
+
+option init_only => (
+    is => 'ro',
+    doc => '',
+    longdoc => '',
+);
+
+has classmgr => (
+    is => 'lazy',
+);
+
+has cfgmgr => (
+    is => 'lazy',
+);
+
+has class_objects => (
+    is => 'lazy',
+);
+
+sub _build_cfgmgr {
+    my $self = shift;
     ###l4p $l4p ||= get_logger();
-    $old_config ||= './mt-config.cgi';
-
-    die "No --new config file specified" unless $new_config;
-
-    my $cfgmgr = MT::ConvertDB::ConfigMgr->new(
-                       new => $new_config,
-        $old_config ? (old => $old_config) : (),
-                 read_only => ($save ? 0 : 1),
+    my %param = (
+        read_only => ($self->save ? 0 : 1),
+        new       => $self->new_config,
+        old       => $self->old_config,
     );
+    MT::ConvertDB::ConfigMgr->new(%param);
+}
 
-    my $classmgr   = MT::ConvertDB::ClassMgr->new();
-    my $class_objs = $classmgr->class_objects($types);
+sub _build_classmgr { MT::ConvertDB::ClassMgr->new() }
 
-    if ( $init_only ) {
+sub _build_class_objects {
+    my $self = shift;
+    $self->classmgr->class_objects($self->types);
+}
+
+sub run {
+    my $self       = shift;
+    my $cfgmgr     = $self->cfgmgr;
+    my $classmgr   = $self->classmgr;
+    my $class_objs = $self->class_objects;
+    ###l4p $l4p ||= get_logger();
+
+    if ( $self->init_only ) {
         $l4p->info('Initialization done.  Exiting due to --init-only');
         exit;
     }
+
+    $self->migrate();
+}
+
+sub migrate {
+    my $self       = shift;
+    my $cfgmgr     = $self->cfgmgr;
+    my $classmgr   = $self->classmgr;
+    my $class_objs = $self->class_objects;
+    ###l4p $l4p ||= get_logger();
 
     my $count       = 0;
     my $next_update = 0;
     my $max         = reduce { $a + $b }
                          map { $_->object_count + $_->meta_count } @$class_objs;
+    print "MAX: $max\n";
     my $progress = Term::ProgressBar->new({
         name => 'Migrated', count => $max, remove => 0
     });

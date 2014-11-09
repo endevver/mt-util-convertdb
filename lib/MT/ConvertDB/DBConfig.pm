@@ -6,6 +6,7 @@ use vars qw( $l4p );
 
 has read_only => (
     is        => 'rw',
+    lazy      => 1,
     default   => 1,
     trigger   => 1,
     predicate => 1,
@@ -60,10 +61,11 @@ sub BUILD {
 }
 
 sub _trigger_read_only {
-    my $self = shift;
-    my $val  = shift;
-    ###l4p $l4p->info(sprintf('Setting %s to %s', $self->driver->{dsn},
-    ###l4p     $val ? 'READ ONLY' : 'WRITEABLE' )) if $val != $self->read_only;
+    my $self  = shift;
+    my $val   = shift;
+    ###l4p $l4p ||= get_logger();
+    ###l4p $l4p->info(sprintf('Driver for %s is %s', $self->driver->{dsn},
+    ###l4p     $val ? 'READ ONLY' : 'WRITEABLE' ));
 }
 
 sub _build_app {

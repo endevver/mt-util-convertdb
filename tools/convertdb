@@ -10,4 +10,4 @@ use lib "$ENV{MT_HOME}/plugins/ConvertDB/lib";
 $| = 1;
 
 use MT::ConvertDB::CLI;
-MT::ConvertDB::CLI->run;
+my $cli = MT::ConvertDB::CLI->new_with_options->run;

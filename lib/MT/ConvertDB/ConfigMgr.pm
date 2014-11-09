@@ -6,7 +6,7 @@ use MT::ConvertDB::DBConfig;
 use vars qw( $l4p );
 
 has read_only => (
-    is      => 'ro',
+    is      => 'rw',
     required => 1,
     trigger  => 1,
 );
@@ -30,7 +30,8 @@ has new_config => (
 
 sub _trigger_read_only {
     my $self = shift;
-    $self->new_config->read_only(@_) if $self->has_new_config;
+    my $val  = shift;
+    return $self->new_config->read_only($val) if $self->has_new_config;
 }
 
 sub BUILD {
