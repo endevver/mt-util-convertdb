@@ -49,7 +49,6 @@ sub BUILD {
 }
 sub object_summary  { shift->new_config->object_summary() }
 sub post_load       { shift->newdb->post_load(@_)         }
-sub post_load_meta  { shift->newdb->post_load_meta(@_)    }
 
 sub use_old_database {
     ###l4p $l4p ||= get_logger(); $l4p->debug('Switching to old database');

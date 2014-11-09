@@ -271,13 +271,6 @@ sub post_load {
     MT->instance->{cfg}->save_config();
 }
 
-sub post_load_meta {
-    my $self     = shift;
-    ###l4p $l4p ||= get_logger();
-    # ##l4p $l4p->warn('post_load_meta is unimplemented');    ### FIXME post_load_meta is unimplemented
-
-}
-
 sub load_meta {
     my $self = shift;
     my ( $obj ) = @_;

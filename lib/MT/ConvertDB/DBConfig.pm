@@ -233,7 +233,6 @@ sub load            { shift; shift->load(@_)         }
 sub load_iter       { shift; shift->load_iter(@_)    }
 sub load_meta       { shift; shift->load_meta(@_)    }
 sub post_load       { shift; shift->post_load()      }
-sub post_load_meta  { shift; shift->post_load_meta() }
 sub object_summary  { p(shift->obj_summary)          }
 
 sub save_meta       {
