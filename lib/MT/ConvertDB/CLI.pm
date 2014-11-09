@@ -113,7 +113,7 @@ sub migrate {
         ### First pass to load/save objects
         ###
         foreach my $classobj ( @$class_objs ) {
-
+            my $class = $classobj->class;
             $cfgmgr->newdb->remove_all( $classobj );
 
             my $iter = $cfgmgr->olddb->load_iter( $classobj );
@@ -125,6 +125,32 @@ sub migrate {
                 $count += scalar(keys %$meta) + 1;
                 $next_update = $progress->update($count)
                   if $count >= $next_update;
+
+                #=====================================================
+                #    DATA TESTING - ABSTRACT OUT AND ENCAPSULATE
+                #=====================================================
+                my $pk_str = $obj->pk_str;
+                $l4p->info('Reloading record from new DB for comparison');
+                my $newobj = try { $cfgmgr->newdb->load($classobj, $obj->primary_key_to_terms) }
+                           catch { $l4p->error($_, l4mtdump($obj->properties)) };
+                foreach my $k ( keys %{$obj->get_values} ) {
+                    $l4p->debug("Comparing $class $pk_str $k values");
+                    use Test::Deep::NoTest;
+                    my $diff = ref($obj->$k) ? (eq_deeply($obj->$k, $newobj->$k)?'':1)
+                                             : DBI::data_diff($obj->$k, $newobj->$k);
+                    if ( $diff ) {
+                        unless ($obj->$k eq '' and $newobj->$k eq '') {
+                            $l4p->error(sprintf(
+                                'Data difference detected in %s ID %d %s!',
+                                $class, $obj->id, $k, $diff
+                            ));
+                            $l4p->error($diff);
+                            $l4p->error('a: '.$obj->$k);
+                            $l4p->error('b: '.$newobj->$k);
+                        }
+                    }
+                }
+                #=====================================================
             }
             ###l4p $l4p->info($classobj->class.' object migration complete');
 
