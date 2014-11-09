@@ -203,7 +203,7 @@ sub load       {
     my $class = $self->class;
     my $count = $self->object_count + $self->meta_count;
     ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->info(sprintf('Loading %d %s objects (%s)', $count, $class, ref($self) ));
+    # ##l4p $l4p->info(sprintf('Loading %d %s objects (%s)', $count, $class, ref($self) ));
     undef $class->properties->{driver};
     undef $class->meta_pkg->properties->{driver} if $class->meta_pkg;
     $self->class->load(@_)
