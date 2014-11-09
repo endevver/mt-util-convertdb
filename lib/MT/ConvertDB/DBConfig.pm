@@ -200,7 +200,7 @@ sub check_plugins {
         for qw( Commercial.pack ConfigAssistant.pack );
 
     my $cpack = $MT::Plugins{'Commercial.pack'};
-    $l4p->logcroak('CustomFields not loaded')
+    $l4p->logwarn('CustomFields not loaded')
         unless $cpack
             && exists( $cpack->{object}{customfields} )
             && @{ $cpack->{object}{customfields} } > 0;
