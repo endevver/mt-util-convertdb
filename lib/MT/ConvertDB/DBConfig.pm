@@ -254,14 +254,6 @@ sub remove_all  {
     ###l4p $l4p->info(sprintf('FAKE Removing %d %s objects (%s)', $count, $class, ref($classobj) ));
 }
 
-before save => sub {
-    my $self               = shift;
-    my ( $classobj, $obj, $meta ) = @_;
-    # ##l4p $l4p ||= get_logger(); $l4p->warn('before save is unimplemented');
-    ### FIXME before save is unimplemented
-
-};
-
 sub save {
     my $self = shift;
     my ( $classobj, $obj, $meta ) = @_;
@@ -277,13 +269,6 @@ sub save {
     ###l4p     $classobj->class,
     ###l4p     ( $obj->has_column('id') ? ' ID '.$obj->id : '.' ) ));
 }
-
-after save => sub {
-    my $self               = shift;
-    my ( $classobj, $obj, $meta ) = @_;
-    # ##l4p $l4p ||= get_logger(); $l4p->warn('after save is unimplemented');
-    ### FIXME after save is unimplemented
-};
 
 sub label {
     my $self = shift;
