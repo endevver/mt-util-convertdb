@@ -67,8 +67,8 @@ sub post_load {
             $summary->{meta}{$cobj->class}  = 0;
             my $iter = $self->olddb->load_iter( $cobj );
             while (my $obj = $iter->()) {
-                $self->olddb->load_meta( $cobj, $obj );
-                $self->newdb->save( $cobj, $obj );
+                my $meta = $self->olddb->load_meta( $cobj, $obj );
+                $self->newdb->save( $cobj, $obj, $meta );
             }
         }
     }

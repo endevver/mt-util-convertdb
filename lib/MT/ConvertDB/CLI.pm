@@ -47,9 +47,10 @@ sub run {
 
             my $iter = $cfgmgr->olddb->load_iter( $classobj );
             while (my $obj = $iter->()) {
-                $cfgmgr->olddb->load_meta( $classobj, $obj );
-                $cfgmgr->newdb->save( $classobj, $obj );
+                my $meta = $cfgmgr->olddb->load_meta( $classobj, $obj );
+                $cfgmgr->newdb->save( $classobj, $obj, $meta );
             }
+
             $cfgmgr->post_load( $classobj );
         }
         $cfgmgr->post_load( $classmgr );

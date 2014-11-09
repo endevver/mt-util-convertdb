@@ -256,7 +256,7 @@ sub remove_all  {
 
 before save => sub {
     my $self               = shift;
-    my ( $classobj, $obj ) = @_;
+    my ( $classobj, $obj, $meta ) = @_;
     # ##l4p $l4p ||= get_logger(); $l4p->warn('before save is unimplemented');
     ### FIXME before save is unimplemented
 
@@ -264,12 +264,12 @@ before save => sub {
 
 sub save {
     my $self = shift;
-    my ( $classobj, $obj ) = @_;
+    my ( $classobj, $obj, $meta ) = @_;
     ###l4p $l4p ||= get_logger();
 
     my $object_summary = $self->obj_summary;
     $object_summary->{total}{$classobj->class}++;
-    $object_summary->{meta}{$classobj->class}++ if $obj->has_meta;
+    $object_summary->{meta}{$classobj->class}++ if $obj->has_meta && %$meta;
 
     return $classobj->save( $obj ) unless $self->read_only;
 
@@ -280,7 +280,7 @@ sub save {
 
 after save => sub {
     my $self               = shift;
-    my ( $classobj, $obj ) = @_;
+    my ( $classobj, $obj, $meta ) = @_;
     # ##l4p $l4p ||= get_logger(); $l4p->warn('after save is unimplemented');
     ### FIXME after save is unimplemented
 };
