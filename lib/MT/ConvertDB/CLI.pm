@@ -117,6 +117,7 @@ sub migrate {
             $cfgmgr->newdb->remove_all( $classobj );
 
             my $iter = $cfgmgr->olddb->load_iter( $classobj );
+            ###l4p $l4p->info($classobj->class.' object migration starting');
             while (my $obj = $iter->()) {
                 my $meta = $cfgmgr->olddb->load_meta( $classobj, $obj );
                 $cfgmgr->newdb->save( $classobj, $obj, $meta );
@@ -125,6 +126,7 @@ sub migrate {
                 $next_update = $progress->update($count)
                   if $count >= $next_update;
             }
+            ###l4p $l4p->info($classobj->class.' object migration complete');
 
             $cfgmgr->post_load( $classobj );
         }

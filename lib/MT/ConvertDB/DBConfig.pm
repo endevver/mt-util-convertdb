@@ -240,7 +240,7 @@ sub save_meta       {
     my ($self, $classobj, $obj) = @_;
     return $classobj->save_meta($obj) unless $self->read_only;
     ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->info(sprintf('FAKE saving metadata for %s%s',
+    ###l4p $l4p->debug(sprintf('FAKE saving metadata for %s%s',
     ###l4p     $classobj->class,
     ###l4p     ( $obj->has_column('id') ? ' ID '.$obj->id : '.' ) ));
 }
@@ -266,7 +266,7 @@ sub save {
 
     return $classobj->save( $obj ) unless $self->read_only;
 
-    ###l4p $l4p->info(sprintf('FAKE saving %s%s',
+    ###l4p $l4p->debug(sprintf('FAKE saving %s%s',
     ###l4p     $classobj->class,
     ###l4p     ( $obj->has_column('id') ? ' ID '.$obj->id : '.' ) ));
 }

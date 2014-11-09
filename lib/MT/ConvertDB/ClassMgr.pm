@@ -251,7 +251,7 @@ before save => sub {
 sub save {
     my ( $self, $obj ) = @_;
     ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->info(sprintf( 'Saving %s%s', $self->class,
+    ###l4p $l4p->debug(sprintf( 'Saving %s%s', $self->class,
     ###l4p     ( $obj->has_column('id') ? ' ID '.$obj->id : '.' )
     ###l4p ));
     undef $obj->properties->{driver};
