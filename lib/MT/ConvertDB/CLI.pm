@@ -1,8 +1,6 @@
 package MT::ConvertDB::CLI;
 
 use MT::ConvertDB::ToolSet;
-use MT::ConvertDB::ConfigMgr;
-use MT::ConvertDB::ClassMgr;
 use Term::ProgressBar 2.00;
 use List::Util qw( reduce );
 use MooX::Options;
@@ -66,10 +64,10 @@ sub _build_cfgmgr {
         new       => $self->new_config,
         old       => $self->old_config,
     );
-    MT::ConvertDB::ConfigMgr->new(%param);
+    use_module('MT::ConvertDB::ConfigMgr')->new(%param);
 }
 
-sub _build_classmgr { MT::ConvertDB::ClassMgr->new() }
+sub _build_classmgr { use_module('MT::ConvertDB::ClassMgr')->new() }
 
 sub _build_class_objects {
     my $self = shift;

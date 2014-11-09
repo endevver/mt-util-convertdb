@@ -25,6 +25,7 @@ ToolSet->export(
     'MT::Logger::Log4perl' => [qw( l4mtdump get_logger :resurrect )],
     'Moo'                  => undef,
     'Sub::Quote'           => 'quote_sub',
+    'Module::Runtime'      => 'use_module',
 );
 
 # define exports from this module

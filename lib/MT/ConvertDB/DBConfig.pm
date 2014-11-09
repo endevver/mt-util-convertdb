@@ -1,7 +1,6 @@
 package MT::ConvertDB::DBConfig;
 
 use MT::ConvertDB::ToolSet;
-use Class::Load qw( load_class );
 use vars qw( $l4p );
 
 has read_only => (
@@ -80,7 +79,7 @@ sub _build_app {
     my $mt = try {
         local $SIG{__WARN__} = sub {};
         no warnings 'once';
-        load_class($app_class);
+        use_module($app_class);
         undef $MT::ConfigMgr::cfg;
         undef $MT::mt_inst;
         $ENV{MT_CONFIG} = $MT::CFG_FILE = $cfg_file;

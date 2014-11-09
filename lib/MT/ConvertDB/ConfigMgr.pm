@@ -1,8 +1,6 @@
 package MT::ConvertDB::ConfigMgr;
 
-# use MT::ConvertDB::Base 'Class';
 use MT::ConvertDB::ToolSet;
-use MT::ConvertDB::DBConfig;
 use vars qw( $l4p );
 
 has read_only => (
@@ -14,7 +12,7 @@ has read_only => (
 has old_config => (
     is        => 'lazy',
     init_arg  => 'old',
-    coerce    => quote_sub(q( MT::ConvertDB::DBConfig->new( $_[0] ); )),
+    coerce    => quote_sub(q( use_module('MT::ConvertDB::DBConfig')->new( $_[0] ); )),
     predicate => 1,
     default   => './mt-config.cgi',
 );
@@ -23,7 +21,7 @@ has new_config => (
     is        => 'ro',
     lazy      => 1,
     init_arg  => 'new',
-    coerce    => quote_sub(q( MT::ConvertDB::DBConfig->new( $_[0] ); )),
+    coerce    => quote_sub(q( use_module('MT::ConvertDB::DBConfig')->new( $_[0] ); )),
     required  => 1,
     predicate => 1,
 );
