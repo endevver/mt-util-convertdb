@@ -124,13 +124,18 @@ my %class_objects_generated;
 
 sub class_objects {
     my $self  = shift;
-    my $types = shift // $self->object_types;
+    my $types = shift;
     ###l4p $l4p ||= get_logger(); $l4p->trace(1);
 
     my @objs;
-    push(@objs, $self->class_object('CustomFields::Field'));
-    push(@objs, $self->class_object('MT::PluginData'));
+    %class_objects_generated = ();
 
+    unless ( $types ) {
+        push(@objs, $self->class_object('CustomFields::Field'));
+        push(@objs, $self->class_object('MT::PluginData'));
+    }
+
+    $types //= $self->object_types;
     foreach my $type ( @$types ) {
         my $class = MT->model($type);
         push( @objs, $self->class_object($class) );
@@ -142,7 +147,7 @@ sub class_object {
     my $self  = shift;
     my $class = shift;
     return if $class_objects_generated{$class}++;
-    $l4p->debug("Generating class object for $class");
+    ###l4p $l4p->debug("Generating class object for $class");
 
     my $class_hierarchy = $self->class_hierarchy;
 
