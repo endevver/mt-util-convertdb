@@ -158,15 +158,15 @@ sub migrate {
         }
         $cfgmgr->post_load( $classmgr );
 
+        $progress->update($max)
+          if $max >= $next_update;
+
         $l4p->info("Done copying data! All went well.");
     }
     catch {
         $l4p->error("An error occurred while loading data: $_");
         exit 1;
     };
-
-    $progress->update($max)
-      if $max >= $next_update;
 
     print "Object counts: ".p($cfgmgr->object_summary);
 }
