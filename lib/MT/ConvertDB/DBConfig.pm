@@ -74,7 +74,6 @@ sub _build_app {
     ###l4p $l4p->info("Constructing new app: $app_class");
     ###l4p $l4p->info('A previous app existed: '.$MT::mt_inst) if $MT::mt_inst;
     ###l4p $l4p->info('A previous config existed: '.$MT::ConfigMgr::cfg) if $MT::ConfigMgr::cfg;
-    ### FIXME Previous app isa MT, not MT::App::CMS
 
     my $mt = try {
         local $SIG{__WARN__} = sub {};
@@ -84,7 +83,7 @@ sub _build_app {
         undef $MT::mt_inst;
         $ENV{MT_CONFIG} = $MT::CFG_FILE = $cfg_file;
         $MT::MT_DIR     = $MT::APP_DIR  = $MT::CFG_DIR = $ENV{MT_HOME};
-        bless {}, $app_class;
+        MT->set_instance( bless {}, $app_class );
     }
     catch {
         $l4p->logcroak("Could not initialize app: $_");
@@ -223,7 +222,7 @@ sub use {
     my $self   = shift;
     ###l4p $l4p ||= get_logger(); $l4p->trace(1);
     no warnings 'once';
-    MT->instance->set_instance( $self->app );
+    MT->set_instance( $self->app );
     $MT::ConfigMgr::cfg              = $self->app->{cfg};
     $MT::ObjectDriverFactory::DRIVER = $MT::Object::DRIVER = $self->driver;
     $self;
