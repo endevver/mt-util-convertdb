@@ -180,11 +180,12 @@ sub finish_init {
     $mt->{user_class}           = 'MT::Author';
     $mt->{plugin_template_path} = 'tmpl';
 
-    $self->check_plugins();
+    $self->check_schema();
 
     $mt->run_callbacks( 'init_app', $mt );
 
-    $self->check_schema();
+    $self->check_plugins();
+
 }
 
 sub check_plugins {
