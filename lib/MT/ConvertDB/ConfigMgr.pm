@@ -59,8 +59,12 @@ sub post_load {
         # Re-load and re-save all blogs/websites to ensure all custom fields migrated
         ###l4p $l4p ||= get_logger();
         ###l4p $l4p->info('Reloading and resaving all blogs/websites to get full metadata');
-        my $cobjs = $classobj->class_objects([qw( blog website )]);
+
+        my $summary = $self->new_config->obj_summary;
+        my $cobjs   = $classobj->class_objects([qw( blog website )]);
         foreach my $cobj ( @$cobjs ) {
+            $summary->{total}{$cobj->class} = 0;
+            $summary->{meta}{$cobj->class}  = 0;
             my $iter = $self->olddb->load_iter( $cobj );
             while (my $obj = $iter->()) {
                 $self->olddb->load_meta( $cobj, $obj );
