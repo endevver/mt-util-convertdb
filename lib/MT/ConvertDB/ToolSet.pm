@@ -18,7 +18,7 @@ ToolSet->use_pragma(qw(feature :5.16));
 # define exports from other modules
 ToolSet->export(
     'Carp'                 => [qw( croak carp longmess cluck confess )],       # get the defaults
-    'Scalar::Util'         => 'blessed',   # or a specific list
+    # 'Scalar::Util'         => 'blessed',   # or a specific list
     'Try::Tiny'            => undef,
     'Data::Printer'        => undef,
     'Path::Tiny'           => undef,
