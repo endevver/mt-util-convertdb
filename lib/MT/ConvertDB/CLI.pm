@@ -148,11 +148,14 @@ sub verify_migration {
     ###l4p $l4p->debug('Reloading record from new DB for comparison');
     my $newobj = try { $cfgmgr->newdb->load($classobj, $obj->primary_key_to_terms) }
                catch { $l4p->error($_, l4mtdump($obj->properties)) };
+
     foreach my $k ( keys %{$obj->get_values} ) {
-        $l4p->debug("Comparing $class $pk_str $k values");
+        ###l4p $l4p->debug("Comparing $class $pk_str $k values");
+
         use Test::Deep::NoTest;
         my $diff = ref($obj->$k) ? (eq_deeply($obj->$k, $newobj->$k)?'':1)
                                  : DBI::data_diff($obj->$k, $newobj->$k);
+
         if ( $diff ) {
             unless ($obj->$k eq '' and $newobj->$k eq '') {
                 $l4p->error(sprintf(
