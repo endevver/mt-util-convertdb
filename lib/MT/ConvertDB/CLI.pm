@@ -117,32 +117,9 @@ sub migrate {
                 $cfgmgr->newdb->save( $classobj, $obj, $meta );
 
 
-                #=====================================================
-                #    DATA TESTING - ABSTRACT OUT AND ENCAPSULATE
-                #=====================================================
-                my $pk_str = $obj->pk_str;
-                $l4p->debug('Reloading record from new DB for comparison');
-                my $newobj = try { $cfgmgr->newdb->load($classobj, $obj->primary_key_to_terms) }
-                           catch { $l4p->error($_, l4mtdump($obj->properties)) };
-                foreach my $k ( keys %{$obj->get_values} ) {
-                    $l4p->debug("Comparing $class $pk_str $k values");
-                    use Test::Deep::NoTest;
-                    my $diff = ref($obj->$k) ? (eq_deeply($obj->$k, $newobj->$k)?'':1)
-                                             : DBI::data_diff($obj->$k, $newobj->$k);
-                    if ( $diff ) {
-                        unless ($obj->$k eq '' and $newobj->$k eq '') {
-                            $l4p->error(sprintf(
-                                'Data difference detected in %s ID %d %s!',
-                                $class, $obj->id, $k, $diff
-                            ));
-                            $l4p->error($diff);
-                            $l4p->error('a: '.$obj->$k);
-                            $l4p->error('b: '.$newobj->$k);
-                        }
-                    }
-                }
-                #=====================================================
                 $self->update_count( scalar(keys %$meta) + 1 );
+
+                $self->verify_migration( $classobj, $obj );
             }
             ###l4p $l4p->info($classobj->class.' object migration complete');
 
@@ -158,6 +135,37 @@ sub migrate {
     };
 
     print "Object counts: ".p($cfgmgr->object_summary);
+}
+
+sub verify_migration {
+    my $self             = shift;
+    my ($classobj, $obj) = @_;
+    ###l4p $l4p ||= get_logger();
+
+    my $cfgmgr = $self->cfgmgr;
+    my $class  = $classobj->class;
+    my $pk_str = $obj->pk_str;
+
+    ###l4p $l4p->debug('Reloading record from new DB for comparison');
+    my $newobj = try { $cfgmgr->newdb->load($classobj, $obj->primary_key_to_terms) }
+               catch { $l4p->error($_, l4mtdump($obj->properties)) };
+    foreach my $k ( keys %{$obj->get_values} ) {
+        $l4p->debug("Comparing $class $pk_str $k values");
+        use Test::Deep::NoTest;
+        my $diff = ref($obj->$k) ? (eq_deeply($obj->$k, $newobj->$k)?'':1)
+                                 : DBI::data_diff($obj->$k, $newobj->$k);
+        if ( $diff ) {
+            unless ($obj->$k eq '' and $newobj->$k eq '') {
+                $l4p->error(sprintf(
+                    'Data difference detected in %s ID %d %s!',
+                    $class, $obj->id, $k, $diff
+                ));
+                $l4p->error($diff);
+                $l4p->error('a: '.$obj->$k);
+                $l4p->error('b: '.$newobj->$k);
+            }
+        }
+    }
 }
 
 sub update_count {
