@@ -89,14 +89,14 @@ sub run {
     my $class_objs = $self->class_objects;
     ###l4p $l4p ||= get_logger();
 
+    my $count       = 0;
+    my $next_update = 0;
+    my $finish      = $self->update_count( $count => $class_objs );
+
     unless ( $self->migrate || $self->verify ) {
         $l4p->info('Initialization done.  Exiting due to --init-only');
         exit;
     }
-
-    my $max = reduce { $a + $b }
-                 map { $_->object_count + $_->meta_count } @$class_objs;
-    $self->update_count( 0 => $max );
 
     try {
         local $SIG{__WARN__} = sub { $l4p->warn($_[0]) };
@@ -119,14 +119,16 @@ sub run {
                 $self->verify_migration( $classobj, $obj )
                     if $self->verify;
 
-                $self->update_count( scalar(keys %$meta) + 1 );
+                $count += 1 + scalar(keys %$meta);
+                $next_update = $self->update_count($count)
+                  if $count >= $next_update;    # efficiency
             }
             ###l4p $l4p->info($classobj->class.' object migration complete');
             $cfgmgr->post_load( $classobj );
         }
         $cfgmgr->post_load( $classmgr );
-        $self->update_count($max);
         ###l4p $l4p->info("Done copying data! All went well.");
+        $self->update_count($finish);
     }
     catch {
         $l4p->error("An error occurred while loading data: $_");
@@ -171,18 +173,18 @@ sub verify_migration {
 }
 
 sub update_count {
-    my ($cnt, $max)    = @_;
-    state $count       = 0;
-    state $next_update = 0;
-    state $maximum     = $max;
-    state $progress    = Term::ProgressBar->new({
-                            name => 'Migrated', count => $max, remove => 0
-                        });
-    $max and $progress->minor(0);
-    $count += $cnt;
-    $next_update = $progress->update($count)
-      if ( $count >= $next_update )
-      || ( $count == $maximum );
+    my $self = shift;
+    my ($cnt, $class_objs) = @_;
+    state $obj_cnt
+        = reduce { $a + $b }
+             map { $_->object_count + $_->meta_count } @$class_objs;
+    state $progress
+        = Term::ProgressBar->new({ name => 'Progress', count => $obj_cnt });
+    if ( $class_objs ) { # Initialization/first call
+        $progress->minor(0);
+        return $obj_cnt;        # Return finish value
+    }
+    $progress->update( $cnt );  # Returns next update value
 }
 
 1;
