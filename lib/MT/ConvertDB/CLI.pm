@@ -86,16 +86,6 @@ sub run {
         exit;
     }
 
-    $self->migrate();
-}
-
-sub migrate {
-    my $self       = shift;
-    my $cfgmgr     = $self->cfgmgr;
-    my $classmgr   = $self->classmgr;
-    my $class_objs = $self->class_objects;
-    ###l4p $l4p ||= get_logger();
-
     my $max = reduce { $a + $b }
                  map { $_->object_count + $_->meta_count } @$class_objs;
     $self->update_count( 0 => $max );
@@ -103,16 +93,13 @@ sub migrate {
     try {
         local $SIG{__WARN__} = sub { $l4p->warn($_[0]) };
 
-        ###
-        ### First pass to load/save objects
-        ###
         foreach my $classobj ( @$class_objs ) {
-            my $class = $classobj->class;
             $cfgmgr->newdb->remove_all( $classobj );
-
             my $iter = $cfgmgr->olddb->load_iter( $classobj );
+
             ###l4p $l4p->info($classobj->class.' object migration starting');
             while (my $obj = $iter->()) {
+
                 my $meta = $cfgmgr->olddb->load_meta( $classobj, $obj );
                 $cfgmgr->newdb->save( $classobj, $obj, $meta );
 
@@ -122,12 +109,11 @@ sub migrate {
                 $self->verify_migration( $classobj, $obj );
             }
             ###l4p $l4p->info($classobj->class.' object migration complete');
-
             $cfgmgr->post_load( $classobj );
         }
         $cfgmgr->post_load( $classmgr );
-        $l4p->info("Done copying data! All went well.");
         $self->update_count($max);
+        ###l4p $l4p->info("Done copying data! All went well.");
     }
     catch {
         $l4p->error("An error occurred while loading data: $_");
