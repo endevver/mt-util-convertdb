@@ -129,6 +129,8 @@ sub run {
             }
             ###l4p $l4p->info($classobj->class.' object migration complete');
             $cfgmgr->post_load( $classobj );
+            $self->verify_counts() if $self->verify;
+
         }
         $cfgmgr->post_load( $classmgr );
         $self->update_count($finish);
@@ -152,6 +154,12 @@ sub verify_migration {
     my $meta = $cfgmgr->newdb->load_meta( $classobj, $newobj );
 
     $classobj->object_diff( $obj, $newobj );
+}
+
+sub verify_counts {
+    my $self = shift;
+    my $class_objs = $self->class_objects;
+    ### TODO Check object counts
 }
 
 sub update_count {
