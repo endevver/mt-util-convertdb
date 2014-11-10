@@ -68,7 +68,7 @@ sub _build_cfgmgr {
     my $self = shift;
     ###l4p $l4p ||= get_logger();
     my %param = (
-        read_only => ($self->save ? 0 : 1),
+        read_only => ($self->dry_run ? 1 : 0),
         new       => $self->new_config,
         old       => $self->old_config,
     );
