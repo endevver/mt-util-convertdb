@@ -31,17 +31,25 @@ option types => (
     longdoc => '',
 );
 
-option save => (
+option dry_run => (
     is => 'ro',
     doc => '',
     longdoc => '',
     default => 0,
 );
 
-option init_only => (
+option migrate => (
     is => 'ro',
     doc => '',
     longdoc => '',
+    default => 0,
+);
+
+option verify => (
+    is => 'ro',
+    doc => '',
+    longdoc => '',
+    default => 0,
 );
 
 has classmgr => (
@@ -81,7 +89,7 @@ sub run {
     my $class_objs = $self->class_objects;
     ###l4p $l4p ||= get_logger();
 
-    if ( $self->init_only ) {
+    unless ( $self->migrate || $self->verify ) {
         $l4p->info('Initialization done.  Exiting due to --init-only');
         exit;
     }
@@ -94,15 +102,15 @@ sub run {
         local $SIG{__WARN__} = sub { $l4p->warn($_[0]) };
 
         foreach my $classobj ( @$class_objs ) {
-            $cfgmgr->newdb->remove_all( $classobj );
+            $self->remove_from_new_db( $classobj );
             my $iter = $cfgmgr->olddb->load_iter( $classobj );
 
             ###l4p $l4p->info($classobj->class.' object migration starting');
             while (my $obj = $iter->()) {
 
                 my $meta = $cfgmgr->olddb->load_meta( $classobj, $obj );
-                $cfgmgr->newdb->save( $classobj, $obj, $meta );
 
+                $self->save_to_newdb( $classobj, $obj, $meta );
 
                 $self->update_count( scalar(keys %$meta) + 1 );
 
@@ -167,6 +175,16 @@ sub update_count {
     $next_update = $progress->update($count)
       if ( $count >= $next_update )
       || ( $count == $maximum );
+}
+
+sub save_to_newdb {
+    my $self = shift;
+    $self->cfgmgr->newdb->save(@_) if $self->migrate;
+}
+
+sub remove_from_new_db {
+    my $self = shift;
+    $self->cfgmgr->newdb->remove_all(@_) if $self->migrate;
 }
 
 1;
