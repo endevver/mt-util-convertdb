@@ -310,6 +310,35 @@ sub save_meta {
     return $meta;
 }
 
+sub object_diff {
+    my $self           = shift;
+    my ($obj, $newobj) = @_;
+
+    my $class  = ref($obj);
+    my $pk_str = $obj->pk_str;
+
+    foreach my $k ( keys %{$obj->get_values} ) {
+        ###l4p $l4p->debug("Comparing $class $pk_str $k values");
+
+        use Test::Deep::NoTest;
+        my $diff = ref($obj->$k) ? (eq_deeply($obj->$k, $newobj->$k)?'':1)
+                                 : DBI::data_diff($obj->$k, $newobj->$k);
+
+        if ( $diff ) {
+            unless ($obj->$k eq '' and $newobj->$k eq '') {
+                $l4p->error(sprintf(
+                    'Data difference detected in %s ID %d %s!',
+                    $class, $obj->id, $k, $diff
+                ));
+                $l4p->error($diff);
+                $l4p->error('a: '.$obj->$k);
+                $l4p->error('b: '.$newobj->$k);
+            }
+        }
+    }
+    return 1;
+}
+
 sub debug_driver {
     my $self = shift;
     my $obj  = shift;
