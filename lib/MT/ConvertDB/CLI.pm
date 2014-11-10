@@ -130,7 +130,7 @@ sub migrate {
                 #    DATA TESTING - ABSTRACT OUT AND ENCAPSULATE
                 #=====================================================
                 my $pk_str = $obj->pk_str;
-                $l4p->info('Reloading record from new DB for comparison');
+                $l4p->debug('Reloading record from new DB for comparison');
                 my $newobj = try { $cfgmgr->newdb->load($classobj, $obj->primary_key_to_terms) }
                            catch { $l4p->error($_, l4mtdump($obj->properties)) };
                 foreach my $k ( keys %{$obj->get_values} ) {
