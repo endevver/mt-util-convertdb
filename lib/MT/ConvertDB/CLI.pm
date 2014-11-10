@@ -102,7 +102,10 @@ sub run {
         local $SIG{__WARN__} = sub { $l4p->warn($_[0]) };
 
         foreach my $classobj ( @$class_objs ) {
-            $self->remove_from_new_db( $classobj );
+
+            $cfgmgr->newdb->remove_all( $classobj )
+                if $self->migrate;
+
             my $iter = $cfgmgr->olddb->load_iter( $classobj );
 
             ###l4p $l4p->info($classobj->class.' object migration starting');
@@ -110,11 +113,13 @@ sub run {
 
                 my $meta = $cfgmgr->olddb->load_meta( $classobj, $obj );
 
-                $self->save_to_newdb( $classobj, $obj, $meta );
+                $cfgmgr->newdb->save( $classobj, $obj, $meta )
+                    if $self->migrate;
+
+                $self->verify_migration( $classobj, $obj )
+                    if $self->verify;
 
                 $self->update_count( scalar(keys %$meta) + 1 );
-
-                $self->verify_migration( $classobj, $obj );
             }
             ###l4p $l4p->info($classobj->class.' object migration complete');
             $cfgmgr->post_load( $classobj );
@@ -175,16 +180,6 @@ sub update_count {
     $next_update = $progress->update($count)
       if ( $count >= $next_update )
       || ( $count == $maximum );
-}
-
-sub save_to_newdb {
-    my $self = shift;
-    $self->cfgmgr->newdb->save(@_) if $self->migrate;
-}
-
-sub remove_from_new_db {
-    my $self = shift;
-    $self->cfgmgr->newdb->remove_all(@_) if $self->migrate;
 }
 
 1;
