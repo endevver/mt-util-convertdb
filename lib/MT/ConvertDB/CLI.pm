@@ -112,7 +112,7 @@ sub run {
 
             my $iter = $cfgmgr->olddb->load_iter( $classobj );
 
-            ###l4p $l4p->info($classobj->class.' object migration starting');
+            ###l4p $l4p->info('START: Processing '.$classobj->class.' objects');
             while (my $obj = $iter->()) {
 
                 my $meta = $cfgmgr->olddb->load_meta( $classobj, $obj );
@@ -127,12 +127,14 @@ sub run {
                 $next_update = $self->update_count($count)
                   if $count >= $next_update;    # efficiency
             }
-            ###l4p $l4p->info($classobj->class.' object migration complete');
-            $cfgmgr->post_load( $classobj );
+            ###l4p $l4p->info('END: '.$classobj->class.' object processing');
+
             $self->verify_counts() if $self->verify;
 
+            $cfgmgr->post_load( $classobj ) unless $self->dry_run;
         }
-        $cfgmgr->post_load( $classmgr );
+        $cfgmgr->post_load( $classmgr ) unless $self->dry_run;
+
         $self->update_count($finish);
         $self->progress('Done copying data! All went well.');
     }
