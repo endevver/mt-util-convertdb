@@ -94,7 +94,11 @@ sub run {
     my $finish      = $self->update_count( $count => $class_objs );
 
     unless ( $self->migrate || $self->verify ) {
-        $l4p->info('Initialization done.  Exiting due to --init-only');
+        $self->update_count($finish);
+        $self->progress(
+              "Class initialization done for $finish objects. "
+            . 'Exiting without --migrate or --verify'
+        );
         exit;
     }
 
@@ -127,15 +131,14 @@ sub run {
             $cfgmgr->post_load( $classobj );
         }
         $cfgmgr->post_load( $classmgr );
-        ###l4p $l4p->info("Done copying data! All went well.");
         $self->update_count($finish);
+        $self->progress('Done copying data! All went well.');
     }
     catch {
         $l4p->error("An error occurred while loading data: $_");
         exit 1;
     };
-
-    print "Object counts: ".p($cfgmgr->object_summary);
+    $self->progress('Object counts: '.p($cfgmgr->object_summary));
 }
 
 sub verify_migration {
@@ -185,6 +188,14 @@ sub update_count {
         return $obj_cnt;        # Return finish value
     }
     $progress->update( $cnt );  # Returns next update value
+}
+
+sub progress {
+    my $self = shift;
+    my $msg  = shift;
+    ###l4p $l4p ||= get_logger();
+    ###l4p $l4p->info($msg);
+    print "$msg\n";
 }
 
 1;
