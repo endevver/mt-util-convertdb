@@ -195,6 +195,9 @@ sub remove_all {
     undef $class->properties->{driver};
     undef $class->meta_pkg->properties->{driver} if $class->meta_pkg;
     $class->remove_all() if $count;
+    if (my $remaining = $class->count) {
+        $l4p->error($remaining." rows remaining in $class table");
+    }
 }
 
 # sub load       { shift->class->load(@_) }
