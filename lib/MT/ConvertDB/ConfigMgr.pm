@@ -60,14 +60,15 @@ sub post_load {
         ###l4p $l4p->info('Reloading and resaving all blogs/websites to get full metadata');
 
         my $summary = $self->new_config->obj_summary;
-        my $cobjs   = $classobj->class_objects([qw( blog website )]);
-        foreach my $cobj ( @$cobjs ) {
+        my @cobjs   = map { $classobj->class_object($_) } qw( MT::Blog MT::Website );
+        foreach my $cobj ( @cobjs ) {
             $summary->{total}{$cobj->class} = 0;
             $summary->{meta}{$cobj->class}  = 0;
             my $iter = $self->olddb->load_iter( $cobj );
             while (my $obj = $iter->()) {
                 my $meta = $self->olddb->load_meta( $cobj, $obj );
                 $self->newdb->save( $cobj, $obj, $meta );
+                $self->use_old_database();
             }
         }
     }
@@ -98,6 +99,7 @@ sub check_configs {
     die "ObjectDrivers are the same: ".$orig->driver->{dsn}
         if $orig->driver->{dsn} eq $new->driver->{dsn};
 
+    no warnings 'once';
     $l4p->debug('@MT::ObjectDriverFactory::drivers: '.p(@MT::ObjectDriverFactory::drivers));
 }
 

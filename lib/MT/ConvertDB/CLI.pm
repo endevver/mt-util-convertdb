@@ -22,7 +22,7 @@ option new_config => (
     longdoc => '',
 );
 
-option types => (
+option classes => (
     is     => 'ro',
     format => 's@',
     autosplit => ',',
@@ -32,6 +32,13 @@ option types => (
 );
 
 option dry_run => (
+    is => 'ro',
+    doc => '',
+    longdoc => '',
+    default => 0,
+);
+
+option resave_source => (
     is => 'ro',
     doc => '',
     longdoc => '',
@@ -64,6 +71,8 @@ has class_objects => (
     is => 'lazy',
 );
 
+sub _build_classmgr { use_module('MT::ConvertDB::ClassMgr')->new() }
+
 sub _build_cfgmgr {
     my $self = shift;
     ###l4p $l4p ||= get_logger();
@@ -75,12 +84,12 @@ sub _build_cfgmgr {
     use_module('MT::ConvertDB::ConfigMgr')->new(%param);
 }
 
-sub _build_classmgr { use_module('MT::ConvertDB::ClassMgr')->new() }
-
 sub _build_class_objects {
     my $self = shift;
-    $self->classmgr->class_objects($self->types);
+    $self->classmgr->class_objects($self->classes);
 }
+
+my ($finish, $count, $next_update) = ( 0, 0, 0 );
 
 sub run {
     my $self       = shift;
@@ -89,79 +98,150 @@ sub run {
     my $class_objs = $self->class_objects;
     ###l4p $l4p ||= get_logger();
 
-    my $count       = 0;
-    my $next_update = 0;
-    my $finish      = $self->update_count( $count => $class_objs );
-
-    unless ( $self->migrate || $self->verify ) {
-        $self->update_count($finish);
-        $self->progress(
-              "Class initialization done for $finish objects. "
-            . 'Exiting without --migrate or --verify'
-        );
-        exit;
-    }
+    $finish = $self->update_count( $count => $class_objs );
 
     try {
         local $SIG{__WARN__} = sub { $l4p->warn($_[0]) };
 
-        foreach my $classobj ( @$class_objs ) {
-
-            $cfgmgr->newdb->remove_all( $classobj )
-                if $self->migrate;
-
-            my $iter = $cfgmgr->olddb->load_iter( $classobj );
-
-            ###l4p $l4p->info('START: Processing '.$classobj->class.' objects');
-            while (my $obj = $iter->()) {
-
-                my $meta = $cfgmgr->olddb->load_meta( $classobj, $obj );
-
-                $cfgmgr->newdb->save( $classobj, $obj, $meta )
-                    if $self->migrate;
-
-                $self->verify_migration( $classobj, $obj )
-                    if $self->verify;
-
-                $count += 1 + scalar(keys %$meta);
-                $next_update = $self->update_count($count)
-                  if $count >= $next_update;    # efficiency
-            }
-            ###l4p $l4p->info('END: '.$classobj->class.' object processing');
-
-            $self->verify_counts() if $self->verify;
-
-            $cfgmgr->post_load( $classobj ) unless $self->dry_run;
+        if ( $self->resave_source ) {
+            $self->do_resave_source();
         }
-        $cfgmgr->post_load( $classmgr ) unless $self->dry_run;
-
-        $self->update_count($finish);
-        $self->progress('Done copying data! All went well.');
+        elsif ( $self->migrate || $self->verify  ) {
+            $self->do_migrate_verify()
+        }
+        else {
+            $self->progress( "Class initialization done for $finish objects. "
+                           . 'Exiting without --migrate or --verify' );
+        }
+        $self->progress('Script complete. All went well.');
     }
     catch {
-        $l4p->error("An error occurred while loading data: $_");
+        $l4p->error("An error occurred: $_");
         exit 1;
     };
+}
+
+sub do_resave_source {
+    my $self       = shift;
+    my $cfgmgr     = $self->cfgmgr;
+    my $classmgr   = $self->classmgr;
+    my $class_objs = $self->class_objects;
+    ###l4p $l4p ||= get_logger();
+
+    $self->progress("Resaving $finish source objects.");
+
+    $cfgmgr->old_config->read_only(0);
+
+    foreach my $classobj ( @$class_objs ) {
+        my $iter = $cfgmgr->olddb->load_iter( $classobj );
+        while ( my $obj = $iter->() ) {
+
+            my $metadata = $cfgmgr->olddb->load_meta( $classobj, $obj );
+
+            $cfgmgr->olddb->save( $classobj, $obj, $metadata )
+                or die "Could not save ".$obj->type." object: ".$obj->errstr;
+
+            $count += 1 + scalar(keys %{$metadata->{meta}});
+            $next_update = $self->update_count($count)
+              if $count >= $next_update;    # efficiency
+        }
+    }
+    $cfgmgr->old_config->read_only(1);
+
+    $self->update_count($finish);
+
+    $self->progress('Resaved all objects!');
+}
+
+sub do_migrate_verify {
+    my $self       = shift;
+    my $cfgmgr     = $self->cfgmgr;
+    my $classmgr   = $self->classmgr;
+    my $class_objs = $self->class_objects;
+    ###l4p $l4p ||= get_logger();
+
+    my %truncated; # Track which tables have been truncated (see next comment)
+
+    foreach my $classobj ( @$class_objs ) {
+
+        # This remove_all works on the driver level so removing entries also
+        # removes pages essentially wiping out the table.  Doing that twice,
+        # after one of the two have been migrated yields poor results.
+        $cfgmgr->newdb->remove_all( $classobj )
+            if $self->migrate and ! $truncated{$classobj->class->datasource}++;
+
+        my $iter = $cfgmgr->olddb->load_iter( $classobj );
+
+
+        ###l4p $l4p->info('START: Processing '.$classobj->class.' objects');
+        while (my $obj = $iter->()) {
+
+            unless (defined($obj)) {
+                $l4p->error($classobj->class." object not defined!");
+                next;
+            }
+
+            my $metadata = $cfgmgr->olddb->load_meta( $classobj, $obj );
+
+            $cfgmgr->newdb->save( $classobj, $obj, $metadata )
+                if $self->migrate;
+
+             $self->verify_migration( $classobj, $obj, $metadata )
+                if $self->verify;
+
+            $count += 1 + scalar(keys %{$metadata->{meta}});
+            $next_update = $self->update_count($count)
+              if $count >= $next_update;    # efficiency
+
+            $cfgmgr->use_old_database();
+        }
+        ###l4p $l4p->info('END: '.$classobj->class.' object processing');
+
+        $cfgmgr->post_load( $classobj ) unless $self->dry_run;
+    }
+    $cfgmgr->post_load( $classmgr ) unless $self->dry_run;
+
+    $self->verify_record_counts() if $self->verify;
+
+    $self->update_count($finish);
+
     $self->progress('Object counts: '.p($cfgmgr->object_summary));
 }
 
 sub verify_migration {
     my $self             = shift;
-    my ($classobj, $obj) = @_;
+    my ($classobj, $obj, $oldmetadata) = @_;
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->debug('Reloading record from new DB for comparison');
     my $cfgmgr = $self->cfgmgr;
     my $newobj = try { $cfgmgr->newdb->load($classobj, $obj->primary_key_to_terms) }
                catch { $l4p->error($_, l4mtdump($obj->properties)) };
-    my $meta = $cfgmgr->newdb->load_meta( $classobj, $newobj );
 
-    $classobj->object_diff( $obj, $newobj );
+    $l4p->info('Loading metadata from newdb for verification') if $obj->isa('MT::Entry');
+    my $newmetadata = $cfgmgr->newdb->load_meta( $classobj, $newobj );
+
+    $classobj->object_diff( $obj, $newobj, $oldmetadata, $newmetadata );
 }
 
-sub verify_counts {
-    my $self = shift;
+sub verify_record_counts {
+    my $self       = shift;
     my $class_objs = $self->class_objects;
-    ### TODO Check object counts
+
+    foreach my $classobj ( @$class_objs ) {
+        my $class    = $classobj->class;
+
+        $self->cfgmgr->use_old_database();
+        my $old = $classobj->full_record_counts();
+
+        $self->cfgmgr->use_new_database();
+        my $new = $classobj->full_record_counts();
+
+        unless ( $old->{total} == $new->{total} ) {
+            ($l4p ||= get_logger)->error(sprintf(
+                'Object count mismatch for %s',
+                $classobj->class ), l4mtdump({ old => $old, new => $new }));
+        }
+    }
 }
 
 sub update_count {
@@ -169,7 +249,7 @@ sub update_count {
     my ($cnt, $class_objs) = @_;
     state $obj_cnt
         = reduce { $a + $b }
-             map { $_->object_count + $_->meta_count } @$class_objs;
+             map { $_->count() + $_->meta_count } @$class_objs;
     state $progress
         = Term::ProgressBar->new({ name => 'Progress', count => $obj_cnt });
     if ( $class_objs ) { # Initialization/first call

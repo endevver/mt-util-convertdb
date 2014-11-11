@@ -225,25 +225,18 @@ sub use {
     ###l4p $l4p ||= get_logger(); $l4p->trace(1);
     no warnings 'once';
     MT->set_instance( $self->app );
-    $MT::ConfigMgr::cfg              = $self->app->{cfg};
-    $MT::ObjectDriverFactory::DRIVER = $MT::Object::DRIVER = $self->driver;
+    $MT::ConfigMgr::cfg                 = $self->app->{cfg};
+    $MT::ObjectDriverFactory::DRIVER    = $MT::Object::DRIVER = $self->driver;
+    $MT::ObjectDriverFactory::dbd_class = $self->driver->dbd;
     $self;
 }
 
-sub load            { shift; shift->load(@_)         }
-sub load_iter       { shift; shift->load_iter(@_)    }
-sub load_meta       { shift; shift->load_meta(@_)    }
-sub post_load       { shift; shift->post_load()      }
-sub object_summary  { p(shift->obj_summary)          }
-
-sub save_meta       {
-    my ($self, $classobj, $obj) = @_;
-    return $classobj->save_meta($obj) unless $self->read_only;
-    ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->debug(sprintf('FAKE saving metadata for %s%s',
-    ###l4p     $classobj->class,
-    ###l4p     ( $obj->has_column('id') ? ' ID '.$obj->id : '.' ) ));
-}
+sub load            { shift; shift->load(@_)       }
+sub count           { shift; shift->count(@_)      }
+sub load_iter       { shift; shift->load_iter(@_)  }
+sub load_meta       { shift; shift->load_meta(@_)  }
+sub post_load       { shift; shift->post_load()    }
+sub object_summary  { p(shift->obj_summary)        }
 
 sub remove_all  {
     my $self     = shift;
@@ -251,19 +244,21 @@ sub remove_all  {
     return $classobj->remove_all() unless $self->read_only;
     ###l4p $l4p ||= get_logger();
     my $class = $classobj->class;
-    my $count = $classobj->object_count + $classobj->meta_count;
+    my $count = $classobj->count + $classobj->meta_count;
     ###l4p $l4p->info(sprintf('FAKE Removing %d %s objects (%s)', $count, $class, ref($classobj) ));
 }
 
 sub save {
     my $self = shift;
-    my ( $classobj, $obj, $meta ) = @_;
+    my ( $classobj, $obj, $metadata ) = @_;
     ###l4p $l4p ||= get_logger();
 
     my $object_summary = $self->obj_summary;
     $object_summary->{total}{$classobj->class}++;
-    $object_summary->{meta}{$classobj->class}++ if $obj->has_meta && %$meta;
+    $object_summary->{meta}{$classobj->class}++ if $obj->has_meta && %{$metadata->{meta}};
 
+    ### FIXME --verify with no migrate yields errors
+    # I THINK the lack of pre/post save routines are making the data inconsistent
     return $classobj->save( $obj ) unless $self->read_only;
 
     ###l4p $l4p->debug(sprintf('FAKE saving %s%s',
