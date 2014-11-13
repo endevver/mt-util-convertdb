@@ -165,6 +165,7 @@ sub do_migrate_verify {
     my %truncated; # Track which tables have been truncated (see next comment)
 
     foreach my $classobj ( @$class_objs ) {
+        my $class = $classobj->class;
 
         # This remove_all works on the driver level so removing entries also
         # removes pages essentially wiping out the table.  Doing that twice,
@@ -174,7 +175,7 @@ sub do_migrate_verify {
 
         my $iter = $cfgmgr->olddb->load_iter( $classobj );
 
-        ###l4p $l4p->info('START: Processing '.$classobj->class.' objects');
+        $self->progress('Processing '.$classobj->class.' objects');
         while (my $obj = $iter->()) {
 
             unless (defined($obj)) {
@@ -196,17 +197,18 @@ sub do_migrate_verify {
 
             $cfgmgr->use_old_database();
         }
-        ###l4p $l4p->info('END: '.$classobj->class.' object processing');
+        ###l4p $l4p->info('Processing '.$classobj->class.' objects complete');
 
         $cfgmgr->post_migrate_class( $classobj ) unless $self->dry_run;
     }
     $cfgmgr->post_migrate( $classmgr ) unless $self->dry_run;
+    $self->progress("Processing of ALL OBJECTS complete.");
 
     $self->verify_record_counts() if $self->verify;
-
     $self->update_count($finish);
 
-    $self->progress('Object counts: '.p($cfgmgr->object_summary));
+    my $summ = $cfgmgr->object_summary;
+    $self->progress('Object counts: '.p($summ)) if %$summ;
 }
 
 sub verify_migration {
@@ -236,7 +238,10 @@ sub verify_record_counts {
 
         my $new = $cfgmgr->newdb->full_record_counts($classobj);
 
-        unless ( $old->{total} == $new->{total} ) {
+        if ( $old->{total} == $new->{total} ) {
+            $self->progress('Object counts match for '.$classobj->class);
+        }
+        else {
             ($l4p ||= get_logger)->error(sprintf(
                 'Object count mismatch for %s',
                 $classobj->class ), l4mtdump({ old => $old, new => $new }));
