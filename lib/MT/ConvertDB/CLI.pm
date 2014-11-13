@@ -32,7 +32,7 @@ option classes => (
 );
 
 option dry_run => (
-    is => 'ro',
+    is => 'rw',
     doc => '',
     longdoc => '',
     default => 0,
@@ -97,6 +97,8 @@ sub run {
     my $classmgr   = $self->classmgr;
     my $class_objs = $self->class_objects;
     ###l4p $l4p ||= get_logger();
+
+    $self->dry_run(1) unless $self->migrate;
 
     $finish = $self->update_count( $count => $class_objs );
 
