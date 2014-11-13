@@ -189,7 +189,6 @@ sub reset_object_drivers {
     # try { undef $class->meta_pkg('summary')->properties->{driver} };
 }
 
-# sub count      { shift->class->count(@_) }
 sub count {
     my $self  = shift;
     my $class = $self->class;
@@ -206,7 +205,6 @@ sub meta_count {
     return ($class->meta_pkg->count() || 0);
 }
 
-# sub remove_all { shift->class->remove_all() }
 sub remove_all {
     my $self  = shift;
     my $class = $self->class;
@@ -232,7 +230,6 @@ sub load {
     my $count = $self->count + $self->meta_count;
     ###l4p $l4p ||= get_logger();
     # ##l4p $l4p->info(sprintf('Loading %d %s objects (%s)', $count, $class, ref($self) ));
-    $self->reset_object_drivers();
     $self->class->load($terms, $args)
 }
 
@@ -243,7 +240,6 @@ sub load_iter {
     my $count = $self->count + $self->meta_count;
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info(sprintf('Getting iter for %d %s objects (%s)', $count, $class, ref($self) ));
-    $self->reset_object_drivers();
     my $iter = $self->class->load_iter($terms, $args)
 }
 
@@ -374,9 +370,6 @@ sub object_diff {
 sub full_record_counts {
     my $self = shift;
     my $c    = $self->class;
-    $self->reset_object_drivers();
-    my $ccol = $self->class->properties->{class_column};
-
     my $tally = { obj  => $self->count(),       #summary => 0,
                   meta => $self->meta_count(),  revs    => 0  };
     $tally->{total} = reduce { $a + $tally->{$b} } qw( 0 obj meta );
