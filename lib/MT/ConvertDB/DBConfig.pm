@@ -245,7 +245,7 @@ sub load_meta          { shift; shift->load_meta(@_)          }
 sub post_migrate       { shift; shift->post_migrate(@_)       }
 sub post_migrate_class { shift; shift->post_migrate_class(@_) }
 sub full_record_counts { shift; shift->full_record_counts(@_) }
-sub object_summary     { p(shift->obj_summary)                }
+sub object_summary     { shift->obj_summary                   }
 
 sub remove_all  {
     my $self     = shift;
