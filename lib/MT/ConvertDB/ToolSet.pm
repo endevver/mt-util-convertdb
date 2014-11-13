@@ -3,7 +3,8 @@ package MT::ConvertDB::ToolSet;
 
 use base 'ToolSet';
 
-BEGIN { $ENV{MT_HOME} = '/Users/jay/Sites/gene.local/html/mt' }
+BEGIN { die "MT_HOME environment not set " unless $ENV{MT_HOME} }
+
 use lib (
     "$ENV{MT_HOME}/lib",
     "$ENV{MT_HOME}/extlib",
