@@ -235,11 +235,11 @@ sub use {
     $self;
 }
 
-sub load            { shift; shift->load(@_)       }
-sub count           { shift; shift->count(@_)      }
-sub load_iter       { shift; shift->load_iter(@_)  }
-sub load_meta       { shift; shift->load_meta(@_)  }
+sub load               { shift; shift->load(@_)               }
+sub count              { shift; shift->count(@_)              }
 sub meta_count         { shift; shift->count(@_)              }
+sub load_iter          { shift; shift->load_iter(@_)          }
+sub load_meta          { shift; shift->load_meta(@_)          }
 sub post_load          { shift; shift->post_load(@_)          }
 sub full_record_counts { shift; shift->full_record_counts(@_) }
 sub object_summary     { p(shift->obj_summary)                }
