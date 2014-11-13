@@ -117,35 +117,13 @@ sub _parse_child_classes {
     return;
 }
 
-# sub debug_driver {
-#     my $self = shift;
-#     my $obj  = shift;
-#     ###l4p $l4p ||= get_logger();
-#     my $meta = $obj->meta;
-#     if ($obj->isa('MT::Entry') or $obj->isa('MT::Blog') && $obj->id == 13 ) {
-#         $l4p->info(ref($obj).' ID '.$obj->id.': ', l4mtdump({
-#             driver_dsn      => $obj->driver->{dsn},
-#             meta_driver_dsn => $obj->meta_pkg->driver->{dsn},
-#             obj_driver      => $obj->driver,
-#             metaobj_driver  => $obj->meta_pkg->driver,
-#             # object        => $obj,
-#             # obj_props       => $obj->properties,
-#             meta            => $meta,
-#             # metapkg_props   => $obj->meta_pkg->properties,
-#         }));
-#     }
-# }
 #############################################################################
 
 package MT::ConvertDB::Role::SimpleSave {
 
     use Moo::Role;
-    use MT::Logger::Log4perl qw( l4mtdump get_logger :resurrect );
-    use vars qw( $l4p );
 
     sub save_method {
-        ###l4p $l4p ||= get_logger();
-        $l4p->info('SIMPLE SAVE');
         sub { shift; shift->save }
     }
 }
