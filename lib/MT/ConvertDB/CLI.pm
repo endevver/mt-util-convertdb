@@ -231,9 +231,11 @@ sub verify_record_counts {
 
         $self->cfgmgr->use_old_database();
         my $old = $classobj->full_record_counts();
+        $l4p->info("OLD database $class counts: ", l4mtdump($old));
 
         $self->cfgmgr->use_new_database();
         my $new = $classobj->full_record_counts();
+        $l4p->info("NEW database $class counts: ", l4mtdump($old));
 
         unless ( $old->{total} == $new->{total} ) {
             ($l4p ||= get_logger)->error(sprintf(
