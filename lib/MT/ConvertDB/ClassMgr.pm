@@ -567,6 +567,14 @@ before save => sub {
 
 #############################################################################
 
+package MT::ConvertDB::ClassMgr::Folder;
+
+use MT::ConvertDB::ToolSet;
+extends 'MT::ConvertDB::ClassMgr::Category';
+use vars qw( $l4p );
+
+#############################################################################
+
 package MT::ConvertDB::ClassMgr::Trackback;
 
 use MT::ConvertDB::ToolSet;
@@ -598,6 +606,13 @@ before save => sub {
     $obj->allow_comments(0)
         if defined($obj->allow_comments) && ($obj->allow_comments eq '');
 };
+
+#############################################################################
+
+package MT::ConvertDB::ClassMgr::Page;
+
+use MT::ConvertDB::ToolSet;
+extends 'MT::ConvertDB::ClassMgr::Entry';
 
 #############################################################################
 
