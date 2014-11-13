@@ -58,7 +58,6 @@ sub post_load {
         # Re-load and re-save all blogs/websites to ensure all custom fields migrated
         ###l4p $l4p ||= get_logger();
         ###l4p $l4p->info('Reloading and resaving all blogs/websites to get full metadata');
-
         my $summary = $self->new_config->obj_summary;
         my @cobjs   = map { $classobj->class_object($_) } qw( MT::Blog MT::Website );
         foreach my $cobj ( @cobjs ) {

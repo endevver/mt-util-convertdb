@@ -189,16 +189,21 @@ sub reset_object_drivers {
     # try { undef $class->meta_pkg('summary')->properties->{driver} };
 }
 
-sub _add_class_column {
-    my $self = shift;
-    my ($terms) = @_;
-    # if ( ! $terms or ref($terms) ) {
-    #     if (my $ccol = $self->class->properties->{class_column} ) {
-    #         $terms ||= {};
-    #         $terms->{$ccol} = '*' unless $terms->{id};
-    #     }
-    # }
-    return $terms;
+# sub count      { shift->class->count(@_) }
+sub count {
+    my $self  = shift;
+    my $class = $self->class;
+    my ($terms, $args) = @_;
+    $self->reset_object_drivers();
+    $class->count($terms, $args) || 0
+}
+
+sub meta_count {
+    my $self  = shift;
+    my $class = $self->class;
+    return 0 unless $class->has_meta && $class->meta_pkg;
+    $self->reset_object_drivers();
+    return ($class->meta_pkg->count() || 0);
 }
 
 # sub remove_all { shift->class->remove_all() }
@@ -225,36 +230,9 @@ sub remove_all {
             $l4p->error($remaining." rows remaining in $class meta table");
         }
     }
-    # if ( $class->has_meta('summary') && $class->meta_pkg('summary') ) {
-    #     # $class->meta_pkg('summary')->remove(undef, { nofetch => 1 });
-    #     $driver->direct_remove( $class->meta_pkg('summary') );
-    #     if (my $remaining = $class->meta_pkg('summary')->count) {
-    #         $l4p->error($remaining." rows remaining in $class summary table");
-    #     }
-    # }
 }
 
-# sub count      { shift->class->count(@_) }
-sub count {
-    my $self  = shift;
-    my $class = $self->class;
-    my ($terms, $args) = @_;
-    ###l4p $l4p ||= get_logger();
-    # ##l4p $l4p->info(sprintf('Loading %d %s objects (%s)', $count, $class, ref($self) ));
-    $self->reset_object_drivers();
-    $class->count($self->_add_class_column($terms), $args) || 0
-}
-
-sub meta_count {
-    my $self  = shift;
-    my $class = $self->class;
-    return 0 unless $class->has_meta && $class->meta_pkg;
-    $self->reset_object_drivers();
-    return ($class->meta_pkg->count() || 0);
-}
-
-# sub load       { shift->class->load(@_) }
-sub load       {
+sub load {
     my $self  = shift;
     my ($terms, $args) = @_;
     my $class = $self->class;
@@ -262,11 +240,10 @@ sub load       {
     ###l4p $l4p ||= get_logger();
     # ##l4p $l4p->info(sprintf('Loading %d %s objects (%s)', $count, $class, ref($self) ));
     $self->reset_object_drivers();
-    $self->class->load($self->_add_class_column($terms), $args)
+    $self->class->load($terms, $args)
 }
 
-# sub load_iter  {
-sub load_iter  {
+sub load_iter {
     my $self = shift;
     my ($terms, $args) = @_;
     my $class = $self->class;
@@ -274,7 +251,7 @@ sub load_iter  {
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info(sprintf('Getting iter for %d %s objects (%s)', $count, $class, ref($self) ));
     $self->reset_object_drivers();
-    my $iter = $self->class->load_iter($self->_add_class_column($terms), $args)
+    my $iter = $self->class->load_iter($terms, $args)
 }
 
 sub load_meta {
@@ -287,38 +264,10 @@ sub load_meta {
     ### TODO Revisions???
     ### TODO Summaries???
 
-    # my $summary = $obj->summary if $obj->has_summary;
-    # $Data::ObjectDriver::DEBUG = 1;
-    # $Data::ObjectDriver::PROFILE = 1;
-    # $obj->meta_obj->refresh();
-
     my $meta = { %{$obj->meta} } || {};
-
-    # if ( $obj->isa('MT::Entry')) {
-    #     if ( %$meta ) {
-    #         $l4p->info('Meta for '.$self->class.' ID '.$obj->id.': ', l4mtdump($meta));
-    #     }
-    #     else {
-    #         $l4p->warn('No metadata. Showing object driver: ', l4mtdump($obj->driver()));
-    #         $l4p->warn('No metadata. Showing meta driver: ', l4mtdump($obj->meta_pkg->driver()));
-    #     }
-    # }
 
     defined($meta->{$_}) && $obj->meta( $_, $meta->{$_} ) foreach keys %$meta;
 
-    # my $revisions = [];
-    # if ( $obj->isa('MT::Revisable') ) {
-    #     $revisions = $obj->load_revision() || [];
-    #     p($revisions);
-    # }
-
-    # $l4p->debug('DBI Profiler: ', l4mtdump($obj->driver->profiler->query_log()));
-    # $obj->driver->profiler->reset();
-    # $Data::ObjectDriver::DEBUG = 0;
-    # $Data::ObjectDriver::PROFILE = 0;
-
-    # return { meta => $meta, summary => $summary, revisions => $revisions };
-    # return { meta => $meta, revisions => $revisions };
     return { meta => $meta };
 }
 
@@ -362,28 +311,8 @@ sub save {
         $l4p->error('Object: '.p($obj));
         exit 1;
     }
-
-    # foreach my $rev ( @{$metadata->{revisions}} ) {
-    #     unless ($rev->save) {
-    #         $l4p->error("Failed to save revision ".$rev->id." for class "
-    #                    . $self->class . ": "
-    #                    . ($rev->errstr||'UNKNOWN ERROR'));
-    #         $l4p->error('Revision: '.p($rev));
-    #         exit 1;
-    #     }
-    # }
-
     return $obj;
 }
-
-after save => sub {
-    my ( $self, $obj, $metadata ) = @_;
-    ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->debug(sprintf( 'after save for %s%s',
-    ###l4p     $self->class,
-    ###l4p     ( $obj->has_column('id') ? ' ID '.$obj->id : '.' )));
-    # ##l4p $l4p->warn('after save is unimplemented');    ### FIXME after save is unimplemented
-};
 
 sub post_load {
     my $self = shift;
@@ -452,12 +381,6 @@ sub object_diff {
             }
         }
     }
-
-    # my $oldrevs = $oldmetadata->{revisions};
-    # my $newrevs = $newmetadata->{revisions};
-    # foreach my $oldrev ( @$oldrevs ) {
-    # }
-
     return 1;
 }
 
@@ -469,9 +392,7 @@ sub full_record_counts {
 
     my $tally = { obj  => $self->count(),       #summary => 0,
                   meta => $self->meta_count(),  revs    => 0  };
-    # $tally->{summary} = ($c->meta_pkg('summary')->count()||0) if $c->has_summary;
-    # $tally->{revs}    = ($c->revision_pkg->count()||0) if $c->isa('MT::Revisable');
-    $tally->{total} = reduce { $a + $tally->{$b} } qw( 0 obj meta ); # revs summary );
+    $tally->{total} = reduce { $a + $tally->{$b} } qw( 0 obj meta );
     return $tally;
 }
 
@@ -494,24 +415,24 @@ sub _parse_child_classes {
     return;
 }
 
-sub debug_driver {
-    my $self = shift;
-    my $obj  = shift;
-    ###l4p $l4p ||= get_logger();
-    my $meta = $obj->meta;
-    if ($obj->isa('MT::Entry') or $obj->isa('MT::Blog') && $obj->id == 13 ) {
-        $l4p->info(ref($obj).' ID '.$obj->id.': ', l4mtdump({
-            driver_dsn      => $obj->driver->{dsn},
-            meta_driver_dsn => $obj->meta_pkg->driver->{dsn},
-            obj_driver      => $obj->driver,
-            metaobj_driver  => $obj->meta_pkg->driver,
-            # object        => $obj,
-            # obj_props       => $obj->properties,
-            meta            => $meta,
-            # metapkg_props   => $obj->meta_pkg->properties,
-        }));
-    }
-}
+# sub debug_driver {
+#     my $self = shift;
+#     my $obj  = shift;
+#     ###l4p $l4p ||= get_logger();
+#     my $meta = $obj->meta;
+#     if ($obj->isa('MT::Entry') or $obj->isa('MT::Blog') && $obj->id == 13 ) {
+#         $l4p->info(ref($obj).' ID '.$obj->id.': ', l4mtdump({
+#             driver_dsn      => $obj->driver->{dsn},
+#             meta_driver_dsn => $obj->meta_pkg->driver->{dsn},
+#             obj_driver      => $obj->driver,
+#             metaobj_driver  => $obj->meta_pkg->driver,
+#             # object        => $obj,
+#             # obj_props       => $obj->properties,
+#             meta            => $meta,
+#             # metapkg_props   => $obj->meta_pkg->properties,
+#         }));
+#     }
+# }
 
 #############################################################################
 
@@ -520,12 +441,6 @@ package MT::ConvertDB::ClassMgr::CustomField::Fields;
 use MT::ConvertDB::ToolSet;
 extends 'MT::ConvertDB::ClassMgr';
 use vars qw( $l4p );
-
-before save => sub {
-    my ( $self, $obj, $metadata ) = @_;
-    ###l4p $l4p ||= get_logger(); $l4p->trace(1);
-
-};
 
 after save => sub {
     my ( $self, $obj, $metadata ) = @_;
