@@ -157,13 +157,17 @@ sub finish_init {
     ###l4p $l4p->info('Finishing initialization');
     my @app_args = my(%param) = ( Config => $self->file.'' );
 
-    $mt->init_lang_defaults(@app_args) or return;
+    $mt->init_lang_defaults(@app_args)
+        or confess('init_lang_defaults returned false');
     $mt->config->read_config($self->file);
     require MT::Plugin;
-    $mt->init_addons(@app_args) or return;
-    $mt->init_config_from_db( \%param ) or return;
+    $mt->init_addons(@app_args)
+        or confess('init_addons returned false');
+    $mt->init_config_from_db( \%param )
+        or confess('init_config_from_db returned false');;
     $mt->init_debug_mode;
-    $mt->init_plugins(@app_args) or return;
+    $mt->init_plugins(@app_args)
+        or confess('init_plugins returned false');
     {
         no warnings 'once';
         $MT::plugins_installed = 1;
@@ -197,7 +201,7 @@ sub check_plugins {
     # Check that certain plugins are loaded:
     %MT::Plugins or $l4p->logcroak('%MT::Plugins not loaded');
 
-    exists( $MT::Plugins{$_} ) || $l4p->logcroak("$_ not loaded")
+    exists( $MT::Plugins{$_} ) || $l4p->logcroak("$_ not loaded: ", l4mtdump([keys %MT::Plugins]))
         for qw( Commercial.pack ConfigAssistant.pack );
 
     my $cpack = $MT::Plugins{'Commercial.pack'};
