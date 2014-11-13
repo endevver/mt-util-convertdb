@@ -452,7 +452,7 @@ after save => sub {
 package MT::ConvertDB::ClassMgr::Template;
 
 use MT::ConvertDB::ToolSet;
-extends 'MT::ConvertDB::ClassMgr';
+extends 'MT::Template', 'MT::ConvertDB::ClassMgr';
 use vars qw( $l4p );
 
 before save => sub {
@@ -474,6 +474,23 @@ before save => sub {
     ## any linked templates.
     my $text = $obj->text;
 };
+
+sub save {
+    my ( $self, $obj, $metadata ) = @_;
+    ###l4p $l4p ||= get_logger();
+    ###l4p $l4p->debug(sprintf( 'Saving %s%s', $self->class,
+    ###l4p     ( $obj->has_column('id') ? ' ID '.$obj->id : '.' )
+    ###l4p ));
+    $self->reset_object_drivers();
+    unless ($obj->SUPER::save) {
+        $l4p->error("Failed to save record for class ".$self->class
+                     . ": " . ($obj->errstr||'UNKNOWN ERROR'));
+        $l4p->error('Object: '.p($obj));
+        exit 1;
+    }
+    return $obj;
+}
+
 
 #############################################################################
 
