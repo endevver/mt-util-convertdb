@@ -471,7 +471,7 @@ sub full_record_counts {
                   meta => $self->meta_count(),  revs    => 0  };
     # $tally->{summary} = ($c->meta_pkg('summary')->count()||0) if $c->has_summary;
     # $tally->{revs}    = ($c->revision_pkg->count()||0) if $c->isa('MT::Revisable');
-    $tally->{total} = reduce { $a + $tally->{$b} } qw( 0 obj meta revs ); #summary );
+    $tally->{total} = reduce { $a + $tally->{$b} } qw( 0 obj meta ); # revs summary );
     return $tally;
 }
 
