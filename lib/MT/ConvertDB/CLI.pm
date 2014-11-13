@@ -217,7 +217,6 @@ sub verify_migration {
     my $newobj = try { $cfgmgr->newdb->load($classobj, $obj->primary_key_to_terms) }
                catch { $l4p->error($_, l4mtdump($obj->properties)) };
 
-    $l4p->info('Loading metadata from newdb for verification') if $obj->isa('MT::Entry');
     my $newmetadata = $cfgmgr->newdb->load_meta( $classobj, $newobj );
 
     $classobj->object_diff( $obj, $newobj, $oldmetadata, $newmetadata );
