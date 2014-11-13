@@ -196,9 +196,9 @@ sub do_migrate_verify {
         }
         ###l4p $l4p->info('END: '.$classobj->class.' object processing');
 
-        $cfgmgr->post_load( $classobj ) unless $self->dry_run;
+        $cfgmgr->post_migrate_class( $classobj ) unless $self->dry_run;
     }
-    $cfgmgr->post_load( $classmgr ) unless $self->dry_run;
+    $cfgmgr->post_migrate( $classmgr ) unless $self->dry_run;
 
     $self->verify_record_counts() if $self->verify;
 
@@ -213,7 +213,7 @@ sub verify_migration {
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->debug('Reloading record from new DB for comparison');
     my $cfgmgr = $self->cfgmgr;
-    my $newobj = try { $cfgmgr->newdb->load($classobj, $obj->primary_key_to_terms) }
+    my $newobj = try { $cfgmgr->newdb->load_object($classobj, $obj) }
                catch { $l4p->error($_, l4mtdump($obj->properties)) };
 
     my $newmetadata = $cfgmgr->newdb->load_meta( $classobj, $newobj );
@@ -225,6 +225,7 @@ sub verify_record_counts {
     my $self       = shift;
     my $cfgmgr     = $self->cfgmgr;
     my $class_objs = $self->class_objects;
+    ###l4p $l4p ||= get_logger();
 
     foreach my $classobj ( @$class_objs ) {
         my $class    = $classobj->class;
@@ -242,11 +243,13 @@ sub verify_record_counts {
 }
 
 sub update_count {
-    my $self = shift;
+    my $self               = shift;
     my ($cnt, $class_objs) = @_;
+    my $cfgmgr             = $self->cfgmgr;
     state $obj_cnt
         = reduce { $a + $b }
-             map { $self->olddb->count($_) + $self->olddb->meta_count($_) } @$class_objs;
+             map { $cfgmgr->olddb->count($_) + $cfgmgr->olddb->meta_count($_) }
+                 @$class_objs;
     state $progress
         = Term::ProgressBar->new({ name => 'Progress', count => $obj_cnt });
     if ( $class_objs ) { # Initialization/first call

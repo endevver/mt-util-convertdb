@@ -2,14 +2,8 @@ package MT::ConvertDB::ClassMgr;
 
 use MT::ConvertDB::ToolSet;
 use List::MoreUtils qw( uniq );
-use List::Util qw( reduce );
+use Class::Load qw( try_load_class load_first_existing_class );
 use vars qw( $l4p );
-
-has primary_classes => (
-    is      => 'lazy',
-    isa     => quote_sub(q( my ($v) = @_; ( defined($v) and ref($v) eq 'ARRAY' ) || die "primary_classes is not an ARRAY ref"; )),
-    builder => 1
-);
 
 has object_classes => (
     is      => 'lazy',
@@ -17,110 +11,9 @@ has object_classes => (
     builder => 1
 );
 
-has category_parents => (
-    is => 'ro',
-    isa => quote_sub(q(ref $_[0] eq 'HASH' or die 'category_parents is not a HASH ref'; )),
-    default => sub { {} },
-);
-
-has object_keys => (
-    is => 'rw',
-    isa => quote_sub(q(
-        ref $_[0] eq 'HASH' or die 'category_parents is not a HASH ref';
-    )),
-    default => sub { {} },
-);
-
-has class => (
-    is      => 'ro',
-    isa     => quote_sub(q( defined($_[0]) or die "class not defined";  )),
-);
-
 has class_hierarchy => (
     is => 'lazy',
 );
-
-has metacolumns => (
-    is        => 'lazy',
-    predicate => 1,
-    clearer   => 1,
-);
-
-sub _build_metacolumns {
-    my $self = shift;
-    require MT::Meta;
-    return [ try { MT::Meta->metadata_by_class($self->class) } ];
-}
-
-sub _trigger_class {
-    my $self = shift;
-    my $class = shift;
-    $self->clear_metacolumns unless defined($self->metacolumns)
-                                 && @{ $self->metacolumns };
-}
-
-sub _build_primary_classes {
-    ###l4p $l4p ||= get_logger(); $l4p->trace(1);
-    my @classes;
-    my $types = MT->registry('object_types'); # p($types);
-    foreach my $type ( keys %$types ) {
-        # object_types value is either a class or an array ref with class as first element
-        my $class      = ref($types->{$type}) ? $types->{$type}[0] : $types->{$type};
-        my $primary_class = MT->model($class->datasource);
-        if ( !defined($primary_class) ) {
-            push( @classes, $class );
-        }
-        elsif ( $primary_class eq $class ) {
-            push( @classes, $primary_class );
-        }
-        else {
-            # Omit classed object classes such as MT::Asset::Video, MT::Website
-            $l4p->debug("Omitting object type '$type' as classed object class");
-            next;
-        }
-    }
-    return [ uniq sort @classes ];
-}
-
-sub _build_object_classes {
-    ###l4p $l4p ||= get_logger(); $l4p->trace(1);
-    my @classes;
-    my $types = MT->registry('object_types'); # p($types);
-    foreach my $type ( keys %$types ) {
-        # object_types value is either a class or an array ref with class as first element
-        push(@classes,
-             ref($types->{$type}) ? $types->{$type}[0] : $types->{$type} );
-    }
-    return [ uniq sort @classes ];
-}
-
-sub _build_class_hierarchy {
-    my $self = shift;
-    ###l4p $l4p ||= get_logger(); $l4p->trace(1);
-
-    # my $classes   = $self->primary_classes;
-    my $classes   = $self->object_classes;
-    my $class_map = {};
-
-    my %processed;
-    foreach my $class ( @$classes ) {
-        next if $processed{$class}++;
-        ###l4p $l4p->debug("Mapping $class");
-
-        $class_map->{$class}{parents} ||= [];
-
-        if ( my @kids = $self->_parse_child_classes( $class ) ) {
-            $class_map->{$class}{children}       = [ @kids ];
-            push( @{ $class_map->{$_}{parents} ||= [] }, $class ) for @kids;
-        }
-    }
-
-    @{$_->{parents}} = uniq( @{$_->{parents}} )
-        for values %$class_map;
-
-    ###l4p $l4p->debug('Class map: '.p($class_map));
-    return $class_map;
-}
 
 my %class_objects_generated;
 
@@ -131,7 +24,6 @@ sub class_objects {
 
     %class_objects_generated = ();
     @$classes or $classes = [
-        # 'CustomFields::Field', 'MT::PluginData', @{$self->primary_classes}
         'CustomFields::Field', 'MT::PluginData', @{$self->object_classes}
     ];
     return [ map { $self->_mk_class_objects($_) } @$classes ];
@@ -155,29 +47,146 @@ sub class_object {
     my $self     = shift;
     my $class    = shift;
     state $cache = {};
-    return $cache->{$class} if $cache->{$class};
+    unless ( $cache->{$class} ) {
+        (my $objclass = $class) =~ s{^(MT::)?}{ref($self).'::'}e;
+        my $obj = $cache->{$class}
+            = load_first_existing_class( $objclass, ref($self).'::Generic' )
+                ->new( class => $class );
+        ###l4p $l4p->info("Using ".ref($obj)." for $class objects");
+    }
+    $cache->{$class};
+}
 
-    my %param = ( class => $class );
+sub post_migrate { }
 
-    (my $class_objclass = $class) =~ s{^MT(?!::ConvertDB)}{ref($self)}e;
+sub _build_object_classes {
+    ###l4p $l4p ||= get_logger(); $l4p->trace(1);
+    my @classes;
+    my $types = MT->registry('object_types'); # p($types);
+    foreach my $type ( keys %$types ) {
+        # object_types value is either a class or an array ref with class as first element
+        push(@classes,
+             ref($types->{$type}) ? $types->{$type}[0] : $types->{$type} );
+    }
+    return [ uniq sort @classes ];
+}
 
-    if ($class_objclass =~ m{::Generic::Generic}) {
-        ($l4p ||= get_logger() )->error(ref($self)." Bad class_objclass for $class: $class_objclass ".Carp::longmess());
-        Carp::confess("No can do $class_objclass");
+sub _build_class_hierarchy {
+    my $self = shift;
+    ###l4p $l4p ||= get_logger(); $l4p->trace(1);
+
+    my $classes   = $self->object_classes;
+    my $class_map = {};
+
+    my %processed;
+    foreach my $class ( @$classes ) {
+        next if $processed{$class}++;
+        ###l4p $l4p->debug("Mapping $class");
+        use_package_optimistically( $class );
+        $class_map->{$class}{parents} ||= [];
+
+        if ( my @kids = $self->_parse_child_classes( $class ) ) {
+            $class_map->{$class}{children}       = [ @kids ];
+            push( @{ $class_map->{$_}{parents} ||= [] }, $class ) for @kids;
+        }
     }
 
-    my $obj = try {
-        $class_objclass->new( %param );
-    }
-    catch {
-        $class_objclass = ref($self).'::Generic';
-        $class_objclass->new( %param );
-    }
-    finally {
-        $l4p->info("Using $class_objclass for $class objects");
-    };
+    @{$_->{parents}} = uniq( @{$_->{parents}} )
+        for values %$class_map;
 
-    return ( $cache->{$class} = $obj );
+    ###l4p $l4p->debug('Class map: '.p($class_map));
+    return $class_map;
+}
+
+sub _parse_child_classes {
+    my ( $self, $class ) = @_;
+
+    my $props_children = $class->properties->{child_classes};
+    return unless $props_children;
+
+    my $reftype = ref($props_children);
+
+    if ( grep { $_ eq $reftype } qw( HASH ARRAY ) ) {
+        return uniq(
+            $reftype eq 'HASH' ? keys %{$props_children} : @{$props_children}
+        );
+    }
+
+    $l4p->warn( "Unrecognized child_classes reference $reftype for $class: ",
+                l4mtdump($props_children) );
+    return;
+}
+
+# sub debug_driver {
+#     my $self = shift;
+#     my $obj  = shift;
+#     ###l4p $l4p ||= get_logger();
+#     my $meta = $obj->meta;
+#     if ($obj->isa('MT::Entry') or $obj->isa('MT::Blog') && $obj->id == 13 ) {
+#         $l4p->info(ref($obj).' ID '.$obj->id.': ', l4mtdump({
+#             driver_dsn      => $obj->driver->{dsn},
+#             meta_driver_dsn => $obj->meta_pkg->driver->{dsn},
+#             obj_driver      => $obj->driver,
+#             metaobj_driver  => $obj->meta_pkg->driver,
+#             # object        => $obj,
+#             # obj_props       => $obj->properties,
+#             meta            => $meta,
+#             # metapkg_props   => $obj->meta_pkg->properties,
+#         }));
+#     }
+# }
+
+#############################################################################
+
+package MT::ConvertDB::SuperClassSave;
+
+use Moo::Role;
+
+sub _save {
+    my ($self, $obj) = @_;
+    my $save = MT::Object->can('save');
+    $obj->$save
+}
+
+#############################################################################
+
+package MT::ConvertDB::ClassMgr::Generic;
+
+use MT::ConvertDB::ToolSet;
+use List::Util qw( reduce );
+extends 'MT::ConvertDB::ClassMgr';
+use vars qw( $l4p );
+
+has object_keys => (
+    is => 'rw',
+    isa => quote_sub(q(
+        ref $_[0] eq 'HASH' or die 'object_keys is not a HASH ref';
+    )),
+    default => sub { {} },
+);
+
+has class => (
+    is      => 'ro',
+    isa     => quote_sub(q( defined($_[0]) or die "class not defined";  )),
+);
+
+has metacolumns => (
+    is        => 'lazy',
+    predicate => 1,
+    clearer   => 1,
+);
+
+sub _build_metacolumns {
+    my $self = shift;
+    require MT::Meta;
+    return [ try { MT::Meta->metadata_by_class($self->class) } ];
+}
+
+sub _trigger_class {
+    my $self = shift;
+    my $class = shift;
+    $self->clear_metacolumns unless defined($self->metacolumns)
+                                 && @{ $self->metacolumns };
 }
 
 sub reset_object_drivers {
@@ -191,7 +200,7 @@ sub reset_object_drivers {
 
 sub count {
     my $self  = shift;
-    my $class = $self->class;
+    my $class = shift || $self->class;
     my ($terms, $args) = @_;
     $self->reset_object_drivers();
     $class->count($terms, $args) || 0
@@ -200,27 +209,30 @@ sub count {
 sub meta_count {
     my $self  = shift;
     my $class = $self->class;
-    return 0 unless $class->has_meta && $class->meta_pkg;
+    return 0 unless $class->meta_pkg && $class->has_meta;
     $self->reset_object_drivers();
     return ($class->meta_pkg->count() || 0);
 }
 
 sub remove_all {
     my $self  = shift;
-    my $class = $self->class;
-    my $count = $self->count;
+    my $class = shift || $self->class;
+    my $count = $self->count($class);
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info(sprintf('Removing %d %s objects (%s)', $count, $class, ref($self) ));
-    $self->reset_object_drivers();
+
+    $self->remove_all( $class->meta_pkg ) if $class->meta_pkg;
 
     MT::Object->driver->direct_remove( $class );
 
     if (my $remaining = $class->count) {
         $l4p->error($remaining." rows remaining in $class table");
     }
+}
 
-    $self->remove_all( $class->meta_pkg )
-        if $class->has_meta && $class->meta_pkg;
+sub load_object {
+    my $self = shift;
+    $self->load( $self->primary_key_to_terms(+shift) );
 }
 
 sub load {
@@ -260,12 +272,14 @@ sub load_meta {
     return { meta => $meta };
 }
 
-before save => sub {
+sub save {
     my ( $self, $obj, $metadata ) = @_;
     ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->debug(sprintf( 'before save for %s%s',
-    ###l4p     $self->class,
-    ###l4p     ( $obj->has_column('id') ? ' ID '.$obj->id : '.' )));
+    ###l4p $l4p->debug(sprintf( 'Saving %s%s', $self->class,
+    ###l4p     ( $obj->has_column('id') ? ' ID '.$obj->id : '.' )
+    ###l4p ));
+    $self->reset_object_drivers();
+
     my $defs = $obj->column_defs;
 
     foreach my $col (keys %{$defs}) {
@@ -285,31 +299,15 @@ before save => sub {
             }
         }
     }
-};
 
-sub save {
-    my ( $self, $obj, $metadata ) = @_;
-    ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->debug(sprintf( 'Saving %s%s', $self->class,
-    ###l4p     ( $obj->has_column('id') ? ' ID '.$obj->id : '.' )
-    ###l4p ));
-    $self->reset_object_drivers();
-    unless ($obj->save) {
+    my $save = $self->can('_save') || sub { shift; shift->save };
+    unless ( $self->$save($obj) ) {
         $l4p->error("Failed to save record for class ".$self->class
                      . ": " . ($obj->errstr||'UNKNOWN ERROR'));
         $l4p->error('Object: '.p($obj));
         exit 1;
     }
     return $obj;
-}
-
-sub post_load {
-    my $self = shift;
-    ###l4p $l4p ||= get_logger(); $l4p->trace(1);
-    return if $self->class;
-    # Anything below here is ONLY called after ALL classes have been loaded. To implement an
-    # actual class post_load, use a subclass (e.g. see MT::ConvertDB::ClassMgr::Category below)
-
 }
 
 sub object_diff {
@@ -367,59 +365,29 @@ sub object_diff {
     return 1;
 }
 
+sub post_migrate_class {}
+
 sub full_record_counts {
     my $self = shift;
     my $c    = $self->class;
-    my $tally = { obj  => $self->count(),       #summary => 0,
-                  meta => $self->meta_count(),  revs    => 0  };
+    no warnings 'once';
+    my $tally = { obj  => $self->count(), meta => $self->meta_count() };
     $tally->{total} = reduce { $a + $tally->{$b} } qw( 0 obj meta );
     return $tally;
 }
 
-sub _parse_child_classes {
-    my ( $self, $class ) = @_;
-
-    my $props_children = $class->properties->{child_classes};
-    return unless $props_children;
-
-    my $reftype = ref($props_children);
-
-    if ( grep { $_ eq $reftype } qw( HASH ARRAY ) ) {
-        return uniq(
-            $reftype eq 'HASH' ? keys %{$props_children} : @{$props_children}
-        );
-    }
-
-    $l4p->warn( "Unrecognized child_classes reference $reftype for $class: ",
-                l4mtdump($props_children) );
-    return;
+sub primary_key_to_terms {
+    my $self = shift;
+    my $obj = shift;
+    $obj->primary_key_to_terms;
 }
-
-# sub debug_driver {
-#     my $self = shift;
-#     my $obj  = shift;
-#     ###l4p $l4p ||= get_logger();
-#     my $meta = $obj->meta;
-#     if ($obj->isa('MT::Entry') or $obj->isa('MT::Blog') && $obj->id == 13 ) {
-#         $l4p->info(ref($obj).' ID '.$obj->id.': ', l4mtdump({
-#             driver_dsn      => $obj->driver->{dsn},
-#             meta_driver_dsn => $obj->meta_pkg->driver->{dsn},
-#             obj_driver      => $obj->driver,
-#             metaobj_driver  => $obj->meta_pkg->driver,
-#             # object        => $obj,
-#             # obj_props       => $obj->properties,
-#             meta            => $meta,
-#             # metapkg_props   => $obj->meta_pkg->properties,
-#         }));
-#     }
-# }
 
 #############################################################################
 
 package MT::ConvertDB::ClassMgr::CustomField::Fields;
 
 use MT::ConvertDB::ToolSet;
-extends 'MT::ConvertDB::ClassMgr';
+extends 'MT::ConvertDB::ClassMgr::Generic';
 
 after save => sub { $_[1]->add_meta };
 
@@ -428,7 +396,9 @@ after save => sub { $_[1]->add_meta };
 package MT::ConvertDB::ClassMgr::Template;
 
 use MT::ConvertDB::ToolSet;
-extends 'MT::Template', 'MT::ConvertDB::ClassMgr';
+extends 'MT::ConvertDB::ClassMgr::Generic';
+with 'MT::ConvertDB::SuperClassSave';
+
 use vars qw( $l4p );
 
 before save => sub {
@@ -451,30 +421,13 @@ before save => sub {
     my $text = $obj->text;
 };
 
-sub save {
-    my ( $self, $obj, $metadata ) = @_;
-    ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->debug(sprintf( 'Saving %s%s', $self->class,
-    ###l4p     ( $obj->has_column('id') ? ' ID '.$obj->id : '.' )
-    ###l4p ));
-    $self->reset_object_drivers();
-    unless ($obj->SUPER::save) {
-        $l4p->error("Failed to save record for class ".$self->class
-                     . ": " . ($obj->errstr||'UNKNOWN ERROR'));
-        $l4p->error('Object: '.p($obj));
-        exit 1;
-    }
-    return $obj;
-}
-
-
 #############################################################################
 
 package MT::ConvertDB::ClassMgr::Author;
 
 use MT::Util;
 use MT::ConvertDB::ToolSet;
-extends 'MT::ConvertDB::ClassMgr';
+extends 'MT::ConvertDB::ClassMgr::Generic';
 use vars qw( $l4p );
 
 before save => sub {
@@ -500,7 +453,7 @@ before save => sub {
 
 package MT::ConvertDB::ClassMgr::Comment;
 use MT::ConvertDB::ToolSet;
-extends 'MT::ConvertDB::ClassMgr';
+extends 'MT::ConvertDB::ClassMgr::Generic';
 
 before save => sub { $_[1]->visible(1) unless defined $_[1]->visible };
 
@@ -508,7 +461,7 @@ before save => sub { $_[1]->visible(1) unless defined $_[1]->visible };
 
 package MT::ConvertDB::ClassMgr::TBPing;
 use MT::ConvertDB::ToolSet;
-extends 'MT::ConvertDB::ClassMgr';
+extends 'MT::ConvertDB::ClassMgr::Generic';
 
 before save => sub { $_[1]->visible(1) unless defined $_[1]->visible };
 
@@ -516,8 +469,14 @@ before save => sub { $_[1]->visible(1) unless defined $_[1]->visible };
 
 package MT::ConvertDB::ClassMgr::Category;
 use MT::ConvertDB::ToolSet;
-extends 'MT::ConvertDB::ClassMgr';
+extends 'MT::ConvertDB::ClassMgr::Generic';
 use vars qw( $l4p );
+
+has category_parents => (
+    is => 'ro',
+    isa => quote_sub(q(ref $_[0] eq 'HASH' or die 'category_parents is not a HASH ref'; )),
+    default => sub { {} },
+);
 
 before save => sub {
     my ( $self, $obj, $metadata ) = @_;
@@ -542,7 +501,7 @@ before save => sub {
     }
 };
 
-sub post_load {
+sub post_migrate {
     my $self = shift;
     ###l4p $l4p ||= get_logger(); $l4p->trace(1);
     # fix up the category parents
@@ -565,7 +524,7 @@ extends 'MT::ConvertDB::ClassMgr::Category';
 
 package MT::ConvertDB::ClassMgr::Trackback;
 use MT::ConvertDB::ToolSet;
-extends 'MT::ConvertDB::ClassMgr';
+extends 'MT::ConvertDB::ClassMgr::Generic';
 
 before save => sub {
     my ( $self, $obj, $metadata ) = @_;
@@ -577,7 +536,7 @@ before save => sub {
 
 package MT::ConvertDB::ClassMgr::Entry;
 use MT::ConvertDB::ToolSet;
-extends 'MT::ConvertDB::ClassMgr';
+extends 'MT::ConvertDB::ClassMgr::Generic';
 
 before save => sub {
     my ( $self, $obj, $metadata ) = @_;
@@ -595,9 +554,34 @@ extends 'MT::ConvertDB::ClassMgr::Entry';
 
 #############################################################################
 
-package MT::ConvertDB::ClassMgr::Generic;
-
+package MT::ConvertDB::ClassMgr::Association;
 use MT::ConvertDB::ToolSet;
-extends 'MT::ConvertDB::ClassMgr';
+extends 'MT::ConvertDB::ClassMgr::Generic';
+with 'MT::ConvertDB::SuperClassSave';
+
+#############################################################################
+
+package MT::ConvertDB::ClassMgr::Tag;
+use MT::ConvertDB::ToolSet;
+extends 'MT::ConvertDB::ClassMgr::Generic';
+with 'MT::ConvertDB::SuperClassSave';
+
+#############################################################################
+
+package MT::ConvertDB::ClassMgr::TheSchwartz::Error;
+use MT::ConvertDB::ToolSet;
+extends 'MT::ConvertDB::ClassMgr::Generic';
+
+sub _save {
+    my $self = shift;
+    my $obj  = shift;
+    $obj->driver->insert($obj);
+}
+
+sub primary_key_to_terms {
+    my $self = shift;
+    my $obj = shift;
+    return { map { $_ => $obj->$_ } qw(error_time jobid funcid) };
+}
 
 1;

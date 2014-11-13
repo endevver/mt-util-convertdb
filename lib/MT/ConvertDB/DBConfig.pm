@@ -236,12 +236,14 @@ sub use {
     $self;
 }
 
-sub load               { shift; shift->load(@_)               }
 sub count              { shift; shift->count(@_)              }
 sub meta_count         { shift; shift->count(@_)              }
+sub load               { shift; shift->load(@_)               }
+sub load_object        { shift; shift->load_object(@_)        }
 sub load_iter          { shift; shift->load_iter(@_)          }
 sub load_meta          { shift; shift->load_meta(@_)          }
-sub post_load          { shift; shift->post_load(@_)          }
+sub post_migrate       { shift; shift->post_migrate(@_)       }
+sub post_migrate_class { shift; shift->post_migrate_class(@_) }
 sub full_record_counts { shift; shift->full_record_counts(@_) }
 sub object_summary     { p(shift->obj_summary)                }
 
@@ -259,8 +261,9 @@ sub save {
     ###l4p $l4p ||= get_logger();
 
     my $object_summary = $self->obj_summary;
-    $object_summary->{total}{$classobj->class}++;
-    $object_summary->{meta}{$classobj->class}++ if $obj->has_meta && %{$metadata->{meta}};
+    $object_summary->{objects}{$classobj->class}++;
+    $object_summary->{meta}{$classobj->class} += keys %{$metadata->{meta}}
+        if $obj->has_meta && %{$metadata->{meta}};
 
     ### FIXME --verify with no migrate yields errors
     # I THINK the lack of pre/post save routines are making the data inconsistent
