@@ -224,17 +224,16 @@ sub verify_migration {
 
 sub verify_record_counts {
     my $self       = shift;
+    my $cfgmgr     = $self->cfgmgr;
     my $class_objs = $self->class_objects;
 
     foreach my $classobj ( @$class_objs ) {
         my $class    = $classobj->class;
 
-        $self->cfgmgr->use_old_database();
-        my $old = $classobj->full_record_counts();
+        my $old = $cfgmgr->olddb->full_record_counts($classobj);
         $l4p->info("OLD database $class counts: ", l4mtdump($old));
 
-        $self->cfgmgr->use_new_database();
-        my $new = $classobj->full_record_counts();
+        my $new = $cfgmgr->newdb->full_record_counts($classobj);
         $l4p->info("NEW database $class counts: ", l4mtdump($old));
 
         unless ( $old->{total} == $new->{total} ) {
@@ -250,7 +249,7 @@ sub update_count {
     my ($cnt, $class_objs) = @_;
     state $obj_cnt
         = reduce { $a + $b }
-             map { $_->count() + $_->meta_count } @$class_objs;
+             map { $self->olddb->count($_) + $self->olddb->meta_count($_) } @$class_objs;
     state $progress
         = Term::ProgressBar->new({ name => 'Progress', count => $obj_cnt });
     if ( $class_objs ) { # Initialization/first call
