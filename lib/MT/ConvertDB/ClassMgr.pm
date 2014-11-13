@@ -376,7 +376,7 @@ sub primary_key_to_terms { $_[1]->primary_key_to_terms }
 
 #############################################################################
 
-package MT::ConvertDB::ClassMgr::CustomField::Fields;
+package MT::ConvertDB::ClassMgr::CustomField::Field;
 
 use MT::ConvertDB::ToolSet;
 extends 'MT::ConvertDB::ClassMgr::Generic';
