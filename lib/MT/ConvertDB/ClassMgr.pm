@@ -372,11 +372,7 @@ sub full_record_counts {
     return $tally;
 }
 
-sub primary_key_to_terms {
-    my $self = shift;
-    my $obj = shift;
-    $obj->primary_key_to_terms;
-}
+sub primary_key_to_terms { $_[1]->primary_key_to_terms }
 
 #############################################################################
 
