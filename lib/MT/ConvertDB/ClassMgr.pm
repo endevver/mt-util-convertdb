@@ -209,27 +209,20 @@ sub meta_count {
 # sub remove_all { shift->class->remove_all() }
 sub remove_all {
     my $self  = shift;
-    my $driver = MT::Object->driver;
     my $class = $self->class;
-    my $count = $self->count + $self->meta_count;
+    my $count = $self->count;
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info(sprintf('Removing %d %s objects (%s)', $count, $class, ref($self) ));
     $self->reset_object_drivers();
 
-    # $class->remove(undef, { nofetch => 1 });
-    $driver->direct_remove( $class );
+    MT::Object->driver->direct_remove( $class );
 
-    # $class->remove_all() if $count;
     if (my $remaining = $class->count) {
         $l4p->error($remaining." rows remaining in $class table");
     }
-    if ( $class->has_meta && $class->meta_pkg ) {
-        # $class->meta_pkg->remove(undef, { nofetch => 1 });
-        $driver->direct_remove( $class->meta_pkg );
-        if (my $remaining = $class->meta_pkg->count) {
-            $l4p->error($remaining." rows remaining in $class meta table");
-        }
-    }
+
+    $self->remove_all( $class->meta_pkg )
+        if $class->has_meta && $class->meta_pkg;
 }
 
 sub load {
