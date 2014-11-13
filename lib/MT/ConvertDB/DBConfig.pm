@@ -221,7 +221,8 @@ sub check_schema {
     my $self = shift;
     ###l4p $l4p ||= get_logger(); $l4p->info('Loading/checking database schema');
     require MT::Upgrade;
-    MT::Upgrade->do_upgrade(Install => 1) or die MT::Upgrade->errstr;
+    MT::Upgrade->do_upgrade( CLI => 1, $self->read_only ? () : ( Install => 1 ) )
+        or die MT::Upgrade->errstr;
 }
 
 sub use {
