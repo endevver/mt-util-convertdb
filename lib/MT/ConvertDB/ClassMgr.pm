@@ -135,17 +135,34 @@ sub _parse_child_classes {
 #         }));
 #     }
 # }
+#############################################################################
+
+package MT::ConvertDB::Role::SimpleSave {
+
+    use Moo::Role;
+    use MT::Logger::Log4perl qw( l4mtdump get_logger :resurrect );
+    use vars qw( $l4p );
+
+    sub save_method {
+        ###l4p $l4p ||= get_logger();
+        $l4p->info('SIMPLE SAVE');
+        sub { shift; shift->save }
+    }
+}
 
 #############################################################################
 
-package MT::ConvertDB::SuperClassSave;
+package MT::ConvertDB::Role::DefaultSave {
 
-use Moo::Role;
+    use Moo::Role;
 
-sub _save {
-    my ($self, $obj) = @_;
-    my $save = MT::Object->can('save');
-    $obj->$save
+    sub save_method {
+        return sub {
+            my ($self, $obj) = @_;
+            my $save = MT::Object->can('save');
+            $obj->$save;
+        }
+    }
 }
 
 #############################################################################
@@ -155,6 +172,7 @@ package MT::ConvertDB::ClassMgr::Generic;
 use MT::ConvertDB::ToolSet;
 use List::Util qw( reduce );
 extends 'MT::ConvertDB::ClassMgr';
+with 'MT::ConvertDB::Role::DefaultSave';
 use vars qw( $l4p );
 
 has object_keys => (
@@ -300,7 +318,7 @@ sub save {
         }
     }
 
-    my $save = $self->can('_save') || sub { shift; shift->save };
+    my $save = $self->save_method;
     unless ( $self->$save($obj) ) {
         $l4p->error("Failed to save record for class ".$self->class
                      . ": " . ($obj->errstr||'UNKNOWN ERROR'));
@@ -397,7 +415,6 @@ package MT::ConvertDB::ClassMgr::Template;
 
 use MT::ConvertDB::ToolSet;
 extends 'MT::ConvertDB::ClassMgr::Generic';
-with 'MT::ConvertDB::SuperClassSave';
 
 use vars qw( $l4p );
 
@@ -557,14 +574,12 @@ extends 'MT::ConvertDB::ClassMgr::Entry';
 package MT::ConvertDB::ClassMgr::Association;
 use MT::ConvertDB::ToolSet;
 extends 'MT::ConvertDB::ClassMgr::Generic';
-with 'MT::ConvertDB::SuperClassSave';
 
 #############################################################################
 
 package MT::ConvertDB::ClassMgr::Tag;
 use MT::ConvertDB::ToolSet;
 extends 'MT::ConvertDB::ClassMgr::Generic';
-with 'MT::ConvertDB::SuperClassSave';
 
 #############################################################################
 
@@ -572,10 +587,13 @@ package MT::ConvertDB::ClassMgr::TheSchwartz::Error;
 use MT::ConvertDB::ToolSet;
 extends 'MT::ConvertDB::ClassMgr::Generic';
 
-sub _save {
-    my $self = shift;
-    my $obj  = shift;
-    $obj->driver->insert($obj);
+sub save_method {
+    get_logger->info(' TSERROR CUSTOM SAVE');
+    return sub {
+        my $self = shift;
+        my $obj  = shift;
+        $obj->driver->insert($obj);
+    }
 }
 
 sub primary_key_to_terms {
