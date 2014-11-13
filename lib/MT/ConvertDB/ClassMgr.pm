@@ -427,12 +427,8 @@ package MT::ConvertDB::ClassMgr::CustomField::Fields;
 
 use MT::ConvertDB::ToolSet;
 extends 'MT::ConvertDB::ClassMgr';
-use vars qw( $l4p );
 
-after save => sub {
-    my ( $self, $obj, $metadata ) = @_;
-    $obj->add_meta;
-};
+after save => sub { $_[1]->add_meta };
 
 #############################################################################
 
@@ -491,7 +487,6 @@ use vars qw( $l4p );
 before save => sub {
     my ( $self, $obj, $metadata ) = @_;
     ###l4p $l4p ||= get_logger(); $l4p->trace();
-
     my $class       = $self->class;
     my $object_keys = $self->object_keys;
 
@@ -511,37 +506,22 @@ before save => sub {
 #############################################################################
 
 package MT::ConvertDB::ClassMgr::Comment;
-
 use MT::ConvertDB::ToolSet;
 extends 'MT::ConvertDB::ClassMgr';
-use vars qw( $l4p );
 
-before save => sub {
-    my ( $self, $obj, $metadata ) = @_;
-    ###l4p $l4p ||= get_logger(); $l4p->trace();
-
-    $obj->visible(1) unless defined $obj->visible;
-};
+before save => sub { $_[1]->visible(1) unless defined $_[1]->visible };
 
 #############################################################################
 
 package MT::ConvertDB::ClassMgr::TBPing;
-
 use MT::ConvertDB::ToolSet;
 extends 'MT::ConvertDB::ClassMgr';
-use vars qw( $l4p );
 
-before save => sub {
-    my ( $self, $obj, $metadata ) = @_;
-    ###l4p $l4p ||= get_logger(); $l4p->trace();
-
-    $obj->visible(1) unless defined $obj->visible;
-};
+before save => sub { $_[1]->visible(1) unless defined $_[1]->visible };
 
 #############################################################################
 
 package MT::ConvertDB::ClassMgr::Category;
-
 use MT::ConvertDB::ToolSet;
 extends 'MT::ConvertDB::ClassMgr';
 use vars qw( $l4p );
@@ -585,23 +565,17 @@ sub post_load {
 #############################################################################
 
 package MT::ConvertDB::ClassMgr::Folder;
-
 use MT::ConvertDB::ToolSet;
 extends 'MT::ConvertDB::ClassMgr::Category';
-use vars qw( $l4p );
 
 #############################################################################
 
 package MT::ConvertDB::ClassMgr::Trackback;
-
 use MT::ConvertDB::ToolSet;
 extends 'MT::ConvertDB::ClassMgr';
-use vars qw( $l4p );
 
 before save => sub {
     my ( $self, $obj, $metadata ) = @_;
-    ###l4p $l4p ||= get_logger(); $l4p->trace();
-
     $obj->entry_id(0) unless defined $obj->entry_id;
     $obj->category_id(0) unless defined $obj->category_id;
 };
@@ -609,15 +583,11 @@ before save => sub {
 #############################################################################
 
 package MT::ConvertDB::ClassMgr::Entry;
-
 use MT::ConvertDB::ToolSet;
 extends 'MT::ConvertDB::ClassMgr';
-use vars qw( $l4p );
 
 before save => sub {
     my ( $self, $obj, $metadata ) = @_;
-    ###l4p $l4p ||= get_logger(); $l4p->trace();
-
     $obj->allow_pings(0)
         if defined($obj->allow_pings) && $obj->allow_pings eq '';
     $obj->allow_comments(0)
@@ -627,7 +597,6 @@ before save => sub {
 #############################################################################
 
 package MT::ConvertDB::ClassMgr::Page;
-
 use MT::ConvertDB::ToolSet;
 extends 'MT::ConvertDB::ClassMgr::Entry';
 
@@ -637,6 +606,5 @@ package MT::ConvertDB::ClassMgr::Generic;
 
 use MT::ConvertDB::ToolSet;
 extends 'MT::ConvertDB::ClassMgr';
-use vars qw( $l4p );
 
 1;

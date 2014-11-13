@@ -172,7 +172,6 @@ sub do_migrate_verify {
 
         my $iter = $cfgmgr->olddb->load_iter( $classobj );
 
-
         ###l4p $l4p->info('START: Processing '.$classobj->class.' objects');
         while (my $obj = $iter->()) {
 
@@ -231,10 +230,8 @@ sub verify_record_counts {
         my $class    = $classobj->class;
 
         my $old = $cfgmgr->olddb->full_record_counts($classobj);
-        $l4p->info("OLD database $class counts: ", l4mtdump($old));
 
         my $new = $cfgmgr->newdb->full_record_counts($classobj);
-        $l4p->info("NEW database $class counts: ", l4mtdump($old));
 
         unless ( $old->{total} == $new->{total} ) {
             ($l4p ||= get_logger)->error(sprintf(
