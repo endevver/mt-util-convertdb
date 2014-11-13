@@ -317,13 +317,10 @@ sub save {
 sub post_load {
     my $self = shift;
     ###l4p $l4p ||= get_logger(); $l4p->trace(1);
-    # fix up the category parents
-    my $cat_parent = $self->category_parents;
-    foreach my $id (keys %$cat_parent) {
-        my $cat = MT::Category->load($id);
-        $cat->parent( $cat_parent->{$id} );
-        $cat->save;
-    }
+    return if $self->class;
+    # Anything below here is ONLY called after ALL classes have been loaded. To implement an
+    # actual class post_load, use a subclass (e.g. see MT::ConvertDB::ClassMgr::Category below)
+
 }
 
 sub object_diff {
@@ -578,6 +575,19 @@ before save => sub {
         $obj->parent(0);
     }
 };
+
+sub post_load {
+    my $self = shift;
+    ###l4p $l4p ||= get_logger(); $l4p->trace(1);
+    # fix up the category parents
+    # $self->reset_object_drivers($obj);  ### FIXME Reset object drivers?
+    my $cat_parent = $self->category_parents;
+    foreach my $id (keys %$cat_parent) {
+        my $cat = MT::Category->load($id);
+        $cat->parent( $cat_parent->{$id} );
+        $cat->save;
+    }
+}
 
 #############################################################################
 
