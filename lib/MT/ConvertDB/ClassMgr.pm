@@ -315,50 +315,56 @@ sub object_diff {
         $l4p->error(ref($obj). ' object not migrated: ', l4mtdump($obj));
         return;
     }
-    my $class  = ref($obj);
-    my $pk_str = $obj->pk_str;
 
-    foreach my $k ( keys %{$obj->get_values} ) {
-        ###l4p $l4p->debug("Comparing $class $pk_str $k values");
+    my %data = (
+        class  => ref($obj),
+        pk_str => $obj->pk_str,
+        old    => $obj->get_values(),
+        new    => $newobj->get_values(),
+    );
 
-        use Test::Deep::NoTest;
-        my $diff = ref($obj->$k) ? (eq_deeply($obj->$k, $newobj->$k)?'':1)
-                                 : DBI::data_diff($obj->$k, $newobj->$k);
+    $self->_object_diff_data( %data );
 
-        if ( $diff ) {
-            unless (($obj->$k//'') eq '' and ($newobj->$k//'') eq '') {
-                $l4p->error(sprintf(
-                    'Data difference detected in %s ID %d %s!',
-                    $class, $obj->id, $k, $diff
-                ));
-                $l4p->error($diff);
-                $l4p->error('a: '.$obj->$k);
-                $l4p->error('b: '.$newobj->$k);
-            }
-        }
+    my @meta = map { keys %{ $_->{meta} } }
+              grep { try { ref($_->{meta}) eq 'HASH' } }
+                   $oldmetadata, $newmetadata;
+
+    if ( @meta ) {
+        $self->_object_diff_data( %data,
+                                  class  => $obj->meta_pkg,
+                                  old    => $oldmetadata->{meta},
+                                  new    => $newmetadata->{meta}, );
     }
 
-    my $oldmeta = $oldmetadata->{meta};
-    my $newmeta = $newmetadata->{meta};
-    foreach my $k ( keys %$oldmeta ) {
-        ###l4p $l4p->debug("Comparing $class $pk_str $k meta values");
-        use Test::Deep::NoTest;
-        my $diff = ref($obj->$k) ? (eq_deeply($oldmeta->{$k}, $newmeta->{$k})?'':1)
-                                 : DBI::data_diff($oldmeta->{$k}, $newmeta->{$k});
-
-        if ( $diff ) {
-            unless (($oldmeta->{$k}//'') eq '' and ($newmeta->{$k}//'') eq '') {
-                $l4p->error(sprintf(
-                    'Data difference detected in %s ID %d %s!',
-                    $class, $obj->id, $k, $diff
-                ));
-                $l4p->error($diff);
-                $l4p->error('a: '.$oldmeta->{$k});
-                $l4p->error('b: '.$newmeta->{$k});
-            }
-        }
-    }
     return 1;
+}
+
+sub _object_diff_data {
+    my $self = shift;
+    my %d    = @_;
+    foreach my $k ( keys %{ $d{old} } ) {
+        ###l4p $l4p->info(join(' ',
+        ###l4p     'Comparing', $d{class}, ($d{pk_str} ? $d{pk_str} : ()), $k, 'meta values'));
+
+        my $old = $d{old}->{$k};
+        my $new = $d{new}->{$k};
+
+        use Test::Deep::NoTest;
+        my $diff = ref($old) ? ( eq_deeply( $old, $new ) ? '' : 1 )
+                             :   DBI::data_diff( $old, $new );
+
+        if ( $diff ) {
+            unless ( ($old//'') eq '' and ($new//'') eq '' ) {
+                $l4p->error(sprintf(
+                    'Data difference detected in %s ID %s %s!',
+                    $d{class}, ($d{pk_str}//''), $k, $diff
+                ));
+                $l4p->error( $diff );
+                $l4p->error( 'a: ', ref($old) ? l4mtdump($old) : $old );
+                $l4p->error( 'b: ', ref($new) ? l4mtdump($new) : $new );
+            }
+        }
+    }
 }
 
 sub post_migrate_class {}
