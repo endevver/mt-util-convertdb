@@ -545,9 +545,10 @@ extends 'MT::ConvertDB::ClassMgr::Entry';
 
 #############################################################################
 
-package MT::ConvertDB::ClassMgr::Association;
+package MT::ConvertDB::ClassMgr::Session;
 use MT::ConvertDB::ToolSet;
 extends 'MT::ConvertDB::ClassMgr::Generic';
+with 'MT::ConvertDB::Role::SimpleSave';
 
 #############################################################################
 
