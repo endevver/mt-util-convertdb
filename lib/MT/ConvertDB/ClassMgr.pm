@@ -324,9 +324,6 @@ sub post_load {
         $cat->parent( $cat_parent->{$id} );
         $cat->save;
     }
-
-    MT->instance->{cfg}->SchemaVersion(MT->schema_version(), 1);
-    MT->instance->{cfg}->save_config();
 }
 
 sub object_diff {

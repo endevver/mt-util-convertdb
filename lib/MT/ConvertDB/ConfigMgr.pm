@@ -70,6 +70,9 @@ sub post_load {
                 $self->use_old_database();
             }
         }
+        $self->use_new_database();
+        MT->instance->{cfg}->SchemaVersion(MT->schema_version(), 1);
+        MT->instance->{cfg}->save_config();
     }
 }
 
