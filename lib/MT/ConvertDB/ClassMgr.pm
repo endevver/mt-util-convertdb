@@ -552,9 +552,50 @@ with 'MT::ConvertDB::Role::SimpleSave';
 
 #############################################################################
 
-package MT::ConvertDB::ClassMgr::Tag;
+package MT::ConvertDB::ClassMgr::Config;
 use MT::ConvertDB::ToolSet;
 extends 'MT::ConvertDB::ClassMgr::Generic';
+
+sub object_diff {
+    my $self           = shift;
+    my ($obj, $newobj) = @_;
+    # ##l4p $l4p ||= get_logger();
+
+    $self->_object_diff_data(
+        class  => ref($obj),
+        pk_str => $obj->pk_str,
+        old    => $self->_parse_db_config($obj),
+        new    => $self->_parse_db_config($newobj),
+    );
+}
+
+sub _parse_db_config {
+    my $self = shift;
+    my @data = split /[\r?\n]/, shift()->data;
+    my %data = ();
+    foreach ( @data ) {
+        chomp;
+        next if !/\S/ || /^#/;
+        my ( $var, $val ) = $_ =~ /^\s*(\S+)\s+(.+)$/;
+        $val =~ s/\s*$// if defined($val);
+        next unless $var && defined($val);
+        next if $var eq 'SchemaVersion'; # We modify this in post_migrate
+        if ( defined($data{$var}) ) {
+            if ( ref($data{$var}) ne 'HASH' ) {
+                my ($k,$v) = $data{$var} =~ m/(.+?)=(.+?)/;
+                $data{$var} = { $k => $v };
+            }
+            if ( my ($k,$v) = $val =~ m/(.+?)=(.+?)/ ) {
+                $data{$var}->{$k} = $v;
+            }
+        }
+        else {
+            $data{$var} = $val;
+        }
+    }
+    # p(%data);
+    return \%data;
+}
 
 #############################################################################
 
