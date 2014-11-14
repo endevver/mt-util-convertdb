@@ -128,7 +128,7 @@ sub run {
     $self->dry_run(1) unless $self->migrate;
 
     $finish = $self->update_count( $count => $class_objs );
-    $l4p->info("$finish objects!!!", l4mtdump($self->progressbar));
+
     try {
         local $SIG{__WARN__} = sub { $l4p->warn($_[0]) };
 
