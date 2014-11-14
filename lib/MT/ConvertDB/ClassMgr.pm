@@ -5,6 +5,15 @@ use List::MoreUtils qw( uniq );
 use Class::Load qw( try_load_class load_first_existing_class );
 use vars qw( $l4p );
 
+has exclude_classes => (
+    is      => 'ro',
+    default => sub { [] },
+);
+
+has include_classes => (
+    is      => 'lazy',
+);
+
 has object_classes => (
     is      => 'lazy',
     isa     => quote_sub(q( my ($v) = @_; ( defined($v) and ref($v) eq 'ARRAY' ) || die "object_classes is not an ARRAY ref"; )),
@@ -15,18 +24,31 @@ has class_hierarchy => (
     is => 'lazy',
 );
 
+sub _build_include_classes {
+    [ 'CustomFields::Field', 'MT::PluginData', @{shift->object_classes} ]
+}
+
 my %class_objects_generated;
 
 sub class_objects {
     my $self    = shift;
-    my $classes = shift;
+    my ( $include, $exclude ) = @_;
     ###l4p $l4p ||= get_logger(); $l4p->trace();
 
     %class_objects_generated = ();
-    @$classes or $classes = [
-        'CustomFields::Field', 'MT::PluginData', @{$self->object_classes}
-    ];
-    return [ map { $self->_mk_class_objects($_) } @$classes ];
+
+    $include ||= $self->include_classes;
+    $exclude ||= $self->exclude_classes;
+
+    $self->_filter_excludes(
+        [ map { $self->_mk_class_objects($_) } @$include ]
+    );
+}
+
+sub _filter_excludes {
+    my $self = shift;
+    my $array = shift;
+    [ grep { ! ($_->class ~~ $self->exclude_classes) } @$array ];
 }
 
 sub _mk_class_objects {

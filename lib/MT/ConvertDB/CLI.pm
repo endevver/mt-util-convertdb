@@ -31,6 +31,15 @@ option classes => (
     longdoc => '',
 );
 
+option skip_classes => (
+    is     => 'ro',
+    format => 's@',
+    autosplit => ',',
+    default => sub { [] },
+    doc => '',
+    longdoc => '',
+);
+
 option dry_run => (
     is => 'rw',
     doc => '',
@@ -81,7 +90,14 @@ has total_objects => (
     predicate => 1,
 );
 
-sub _build_classmgr { use_module('MT::ConvertDB::ClassMgr')->new() }
+sub _build_classmgr {
+    my $self = shift;
+    my %param = ();
+    $param{include_classes} = $self->classes      if @{$self->classes};
+    $param{exclude_classes} = $self->skip_classes if @{$self->skip_classes};
+    use_module('MT::ConvertDB::ClassMgr')->new(%param);
+}
+
 
 sub _build_cfgmgr {
     my $self = shift;
@@ -95,8 +111,11 @@ sub _build_cfgmgr {
 }
 
 sub _build_class_objects {
-    my $self = shift;
-    $self->classmgr->class_objects($self->classes);
+    my $self  = shift;
+    [
+        grep { ! ( $_->class ~~ $self->skip_classes ) }
+            @{$self->classmgr->class_objects()}
+    ];
 }
 
 my ($finish, $count, $next_update) = ( 0, 0, 0 );
@@ -104,7 +123,6 @@ my ($finish, $count, $next_update) = ( 0, 0, 0 );
 sub _build_progressbar {
     my $self = shift;
     ###l4p $l4p ||= get_logger();
-    $l4p->info('Here with count '.$self->total_objects);
     die "Progress bar requires total_objects count" unless $self->total_objects;
     my $p = Term::ProgressBar->new({
         name  => 'Progress',
@@ -162,6 +180,7 @@ sub do_resave_source {
     $cfgmgr->old_config->read_only(0);
 
     foreach my $classobj ( @$class_objs ) {
+
         my $iter = $cfgmgr->olddb->load_iter( $classobj );
         while ( my $obj = $iter->() ) {
 
@@ -192,6 +211,7 @@ sub do_migrate_verify {
     my %truncated; # Track which tables have been truncated (see next comment)
 
     foreach my $classobj ( @$class_objs ) {
+
         my $class = $classobj->class;
 
         # This remove_all works on the driver level so removing entries also
@@ -304,27 +324,3 @@ sub progress {
 
 1;
 
-__END__
-
-=head1 NAME
-
-convert-db - A tool to convert backend database of Movable Type
-
-=head1 SYNOPSIS
-
-convert-db --new=mt-config.cgi.new [--old=mt-config.cgi.current]
-
-=head1 DESCRIPTION
-
-I<convert-db> is a tool to convert database of Movable Type to
-others.  It is useful when it is necessary to switch like from
-MySQL to PostgreSQL.
-
-The following options are available:
-
-  --new       mt-config.cgi file of destination
-  --old       mt-config.cgi file of source (optional)
-
-It is also useful to replicate Movable Type database.
-
-=cut
