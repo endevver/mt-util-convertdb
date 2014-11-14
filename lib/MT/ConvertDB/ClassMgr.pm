@@ -632,7 +632,6 @@ use MT::ConvertDB::ToolSet;
 extends 'MT::ConvertDB::ClassMgr::Generic';
 
 sub save_method {
-    get_logger->info(' TSERROR CUSTOM SAVE');
     return sub {
         my $self = shift;
         my $obj  = shift;
