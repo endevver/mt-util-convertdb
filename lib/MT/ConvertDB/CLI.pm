@@ -252,10 +252,11 @@ sub do_migrate_verify {
     $self->progress("Processing of ALL OBJECTS complete.");
 
     $self->verify_record_counts() if $self->verify;
-    $self->update_count($finish);
 
     my $summ = $cfgmgr->object_summary;
     $self->progress('Object counts: '.p($summ)) if %$summ;
+
+    $self->update_count($finish);
 }
 
 sub verify_migration {
