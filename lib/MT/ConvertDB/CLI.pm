@@ -71,6 +71,16 @@ has class_objects => (
     is => 'lazy',
 );
 
+has progressbar => (
+    is        => 'lazy',
+    predicate => 1,
+);
+
+has total_objects => (
+    is        => 'rw',
+    predicate => 1,
+);
+
 sub _build_classmgr { use_module('MT::ConvertDB::ClassMgr')->new() }
 
 sub _build_cfgmgr {
@@ -91,6 +101,23 @@ sub _build_class_objects {
 
 my ($finish, $count, $next_update) = ( 0, 0, 0 );
 
+sub _build_progressbar {
+    my $self = shift;
+    ###l4p $l4p ||= get_logger();
+    $l4p->info('Here with count '.$self->total_objects);
+    die "Progress bar requires total_objects count" unless $self->total_objects;
+    my $p = Term::ProgressBar->new({
+        name  => 'Progress',
+        count => $self->total_objects,
+        ETA   => 'linear'
+    });
+    $p->max_update_rate(1),
+    $p->minor(0);
+    ###l4p $l4p->info(sprintf('Initialized progress bar with %d objects: ',
+    ###l4p              $self->total_objects), l4mtdump($p));
+    $p;
+}
+
 sub run {
     my $self       = shift;
     my $cfgmgr     = $self->cfgmgr;
@@ -101,7 +128,7 @@ sub run {
     $self->dry_run(1) unless $self->migrate;
 
     $finish = $self->update_count( $count => $class_objs );
-
+    $l4p->info("$finish objects!!!", l4mtdump($self->progressbar));
     try {
         local $SIG{__WARN__} = sub { $l4p->warn($_[0]) };
 
@@ -253,17 +280,17 @@ sub update_count {
     my $self               = shift;
     my ($cnt, $class_objs) = @_;
     my $cfgmgr             = $self->cfgmgr;
-    state $obj_cnt
-        = reduce { $a + $b }
-             map { $cfgmgr->olddb->count($_) + $cfgmgr->olddb->meta_count($_) }
-                 @$class_objs;
-    state $progress
-        = Term::ProgressBar->new({ name => 'Progress', count => $obj_cnt });
+
     if ( $class_objs ) { # Initialization/first call
-        $progress->minor(0);
-        return $obj_cnt;        # Return finish value
+        $self->total_objects(
+            reduce { $a + $b }
+               map {   $cfgmgr->olddb->count($_)
+                     + $cfgmgr->olddb->meta_count($_) } @$class_objs
+        );
+        my $p = $self->progressbar();
+        return $self->total_objects;        # Return finish value
     }
-    $progress->update( $cnt );  # Returns next update value
+    $self->progressbar->update( $cnt );  # Returns next update value
 }
 
 sub progress {
@@ -271,7 +298,8 @@ sub progress {
     my $msg  = shift;
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info($msg);
-    print "$msg\n";
+    my $p = $self->progressbar;
+    $p->message($msg);
 }
 
 1;
