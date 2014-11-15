@@ -287,7 +287,7 @@ sub load_meta {
 
     defined($meta->{$_}) && $obj->meta( $_, $meta->{$_} ) foreach keys %$meta;
 
-    return { meta => $meta };
+    return $meta;
 }
 
 sub save {
@@ -330,7 +330,7 @@ sub save {
 
 sub object_diff {
     my $self           = shift;
-    my ($obj, $newobj, $oldmetadata, $newmetadata) = @_;
+    my ($obj, $newobj, $oldmeta, $newmeta) = @_;
     ###l4p $l4p ||= get_logger();
 
     if ( ! $newobj ) {

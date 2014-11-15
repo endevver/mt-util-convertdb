@@ -257,13 +257,13 @@ sub remove_all  {
 
 sub save {
     my $self = shift;
-    my ( $classobj, $obj, $metadata ) = @_;
+    my ( $classobj, $obj, $meta ) = @_;
     ###l4p $l4p ||= get_logger();
 
     my $object_summary = $self->obj_summary;
     $object_summary->{objects}{$classobj->class}++;
-    $object_summary->{meta}{$classobj->class} += keys %{$metadata->{meta}}
-        if $obj->has_meta && %{$metadata->{meta}};
+    $object_summary->{meta}{$classobj->class} += keys %$meta
+        if $obj->has_meta && %$meta;
 
     ### FIXME --verify with no migrate yields errors
     # I THINK the lack of pre/post save routines are making the data inconsistent
@@ -283,5 +283,6 @@ sub label {
               ']'
     );
 }
+
 
 1;

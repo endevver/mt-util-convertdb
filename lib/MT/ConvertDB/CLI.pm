@@ -184,12 +184,12 @@ sub do_resave_source {
         my $iter = $cfgmgr->olddb->load_iter( $classobj );
         while ( my $obj = $iter->() ) {
 
-            my $metadata = $cfgmgr->olddb->load_meta( $classobj, $obj );
+            my $meta = $cfgmgr->olddb->load_meta( $classobj, $obj );
 
-            $cfgmgr->olddb->save( $classobj, $obj, $metadata )
+            $cfgmgr->olddb->save( $classobj, $obj, $meta )
                 or die "Could not save ".$obj->type." object: ".$obj->errstr;
 
-            $count += 1 + scalar(keys %{$metadata->{meta}});
+            $count += 1 + scalar(keys %$meta);
             $next_update = $self->update_count($count)
               if $count >= $next_update;    # efficiency
         }
@@ -230,15 +230,15 @@ sub do_migrate_verify {
                 next;
             }
 
-            my $metadata = $cfgmgr->olddb->load_meta( $classobj, $obj );
+            my $meta = $cfgmgr->olddb->load_meta( $classobj, $obj );
 
-            $cfgmgr->newdb->save( $classobj, $obj, $metadata )
+            $cfgmgr->newdb->save( $classobj, $obj, $meta )
                 if $self->migrate;
 
-             $self->verify_migration( $classobj, $obj, $metadata )
+             $self->verify_migration( $classobj, $obj, $meta )
                 if $self->verify;
 
-            $count += 1 + scalar(keys %{$metadata->{meta}});
+            $count += 1 + scalar(keys %$meta);
             $next_update = $self->update_count($count)
               if $count >= $next_update;    # efficiency
 
@@ -261,16 +261,16 @@ sub do_migrate_verify {
 
 sub verify_migration {
     my $self             = shift;
-    my ($classobj, $obj, $oldmetadata) = @_;
+    my ($classobj, $obj, $oldmeta) = @_;
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->debug('Reloading record from new DB for comparison');
     my $cfgmgr = $self->cfgmgr;
     my $newobj = try { $cfgmgr->newdb->load_object($classobj, $obj) }
                catch { $l4p->error($_, l4mtdump($obj->properties)) };
 
-    my $newmetadata = $cfgmgr->newdb->load_meta( $classobj, $newobj );
+    my $newmeta = $cfgmgr->newdb->load_meta( $classobj, $newobj );
 
-    $classobj->object_diff( $obj, $newobj, $oldmetadata, $newmetadata );
+    $classobj->object_diff( $obj, $newobj, $oldmeta, $newmeta );
 }
 
 sub verify_record_counts {
