@@ -221,7 +221,9 @@ sub count {
     my $class = shift || $self->class;
     my ($terms, $args) = @_;
     $self->reset_object_drivers();
-    $class->count($terms, $args) || 0
+    $class->_pre_search_scope_terms_to_class(($terms ||= {}), $args)
+        unless UNIVERSAL::isa( $class, 'MT::Object::Meta');
+    return $class->count($terms, $args) || 0;
 }
 
 sub meta_count {
@@ -229,6 +231,7 @@ sub meta_count {
     my $class = $self->class;
     return 0 unless $class->meta_pkg && $class->has_meta;
     $self->reset_object_drivers();
+    ### FIXME meta_count does not take classed objects into account so both MT::Blog/Website report ALL of the objects in the meta table.  Grrrr.
     return ($class->meta_pkg->count() || 0);
 }
 
