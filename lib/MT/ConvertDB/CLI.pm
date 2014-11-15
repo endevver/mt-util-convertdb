@@ -270,7 +270,10 @@ sub verify_migration {
 
     my $newmeta = $cfgmgr->newdb->load_meta( $classobj, $newobj );
 
-    $classobj->object_diff( $obj, $newobj, $oldmeta, $newmeta );
+    $classobj->object_diff(
+        objects => [ $obj,     $newobj  ],
+        meta    => [ $oldmeta, $newmeta ],
+    );
 }
 
 sub verify_record_counts {

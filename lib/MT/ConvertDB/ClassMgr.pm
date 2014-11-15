@@ -328,37 +328,90 @@ sub save {
     return $obj;
 }
 
+=head2 object_diff
+
+object_diff is a method responsible for comparing old and new versions of the
+same object, or alternately, a hash of their values.  If you have two objects
+and, optionally, their metadata (as in MT::ConvertDB::CLI::verify_migration),
+you call it like so:
+
+        $classmgr->object_diff(
+            objects => [ $old,     $new     ],
+            meta    => [ $oldmeta, $newmeta ],    # optional
+        );
+
+=head3 Comparing object values hashes
+
+In addition, you can also call on this method to compare two values hashes
+dumped from an object (e.g. MT::ConvertDB::ClassMgr::Config) in which case
+you call it like so:
+
+        $classmgr->object_diff(
+            class  => ref($obj),
+            pk_str => $obj->pk_str,
+            data   => [ \%old,    \%new    ],
+            meta   => [ $oldmeta, $newmeta ],    # optional
+        );
+
+Or, more concisely:
+
+        $classmgr->object_diff(
+            object => $obj,
+            data   => [ \%old,    \%new    ],
+            meta   => [ $oldmeta, $newmeta ],    # optional
+        );
+
+=cut
 sub object_diff {
-    my $self           = shift;
-    my ($obj, $newobj, $oldmeta, $newmeta) = @_;
+    my $self = shift;
+    my %args = @_;
     ###l4p $l4p ||= get_logger();
 
-    if ( ! $newobj ) {
-        $l4p->error(ref($obj). ' object not migrated: ', l4mtdump($obj));
-        return;
+    my ( $old, $new, $class );
+
+    #
+    # Object validation
+    #
+    if ( $args{objects} ) {
+        ( $old, $new ) = @{ $args{objects} };
+        $args{class}   = $class  = ref $old;
+        $args{old}     = $old->get_values();
+        $args{new}     = $new->get_values() if $new;
+    }
+    elsif ( $args{object} ) {
+        my $obj         = $args{object};
+        $args{class}  ||= ref $obj;
+        $args{pk_str} ||= $obj->pk_str || '';
     }
 
-    my %data = (
-        class  => ref($obj),
-        pk_str => $obj->pk_str,
-        old    => $obj->get_values(),
-        new    => $newobj->get_values(),
-    );
+    if ( $args{new} ) {
+        $self->_object_diff( %args );
+    }
+    else {
+        $l4p->error("$class object not migrated: ", l4mtdump($old));
+        return 1;
+    }
 
-    $self->_object_diff_data( %data );
+    #
+    # Metadata validation
+    #
+    if ( my @meta =  map { keys %$_ }
+                    grep { ref $_ eq 'HASH' } @{$args{meta}} ) {
 
-    my @meta = map { keys %{ $_->{meta} } }
-              grep { try { ref($_->{meta}) eq 'HASH' } }
-                   $oldmetadata, $newmetadata;
-
-    if ( @meta ) {
-        $self->_object_diff_data( %data,
-                                  class  => $obj->meta_pkg,
-                                  old    => $oldmetadata->{meta},
-                                  new    => $newmetadata->{meta}, );
+        $self->_object_diff(
+            %args,
+            class => $args{class}->meta_pkg,
+            old   => $args{meta}->[0],
+            new   => $args{meta}->[1],
+        );
     }
 
     return 1;
+}
+
+sub _object_diff {
+    my $self = shift;
+    $self->_object_diff_data(@_);
 }
 
 sub _object_diff_data {
@@ -374,18 +427,31 @@ sub _object_diff_data {
         use Test::Deep::NoTest;
         my $diff = ref($old) ? ( eq_deeply( $old, $new ) ? '' : 1 )
                              :   DBI::data_diff( $old, $new );
+        $diff
+            && $self->report_diff( %d, diff => $diff );
+    }
+}
 
-        if ( $diff ) {
-            unless ( ($old//'') eq '' and ($new//'') eq '' ) {
-                $l4p->error(sprintf(
-                    'Data difference detected in %s ID %s %s!',
-                    $d{class}, ($d{pk_str}//''), $k, $diff
-                ));
-                $l4p->error( $diff );
-                $l4p->error( 'a: ', ref($old) ? l4mtdump($old) : $old );
-                $l4p->error( 'b: ', ref($new) ? l4mtdump($new) : $new );
-            }
-        }
+sub report_diff {
+    my $self = shift;
+    my %d    = @_;
+    # push( @diffs, [$vold, $vnew, $key, $diff ] )
+    # ($vold//'') eq '' and DBI::data_diff( $vold, $vnew, 'ignore encoding')
+
+    my $diff = $d{diff};
+    my $key  = $d{key};
+    my $vold = $d{args}->{old}{$key} // '';
+    my $vnew = $d{args}->{new}{$key} // '';
+
+    unless ( $vold.$vnew eq '' ) {
+        $l4p->error(sprintf(
+            'Data difference detected in %s ID %s %s',
+            $d{class}, ($d{pk_str}//''), $key, $diff
+        ));
+        $l4p->error( $diff );
+        $l4p->error( 'a: ', ref($vold) ? l4mtdump($vold) : $vold );
+        $l4p->error( 'b: ', ref($vnew) ? l4mtdump($vnew) : $vnew );
+        $l4p->error( 'a object: ', l4mtdump($d{args}->{old}));
     }
 }
 
@@ -585,16 +651,18 @@ use MT::ConvertDB::ToolSet;
 extends 'MT::ConvertDB::ClassMgr::Generic';
 
 sub object_diff {
-    my $self           = shift;
-    my ($obj, $newobj) = @_;
+    my $self = shift;
+    my %args = @_;
     # ##l4p $l4p ||= get_logger();
 
-    $self->_object_diff_data(
-        class  => ref($obj),
-        pk_str => $obj->pk_str,
-        old    => $self->_parse_db_config($obj),
-        new    => $self->_parse_db_config($newobj),
-    );
+    my ($old,$new) = @{$args{objects}};
+
+    $self->SUPER::object_diff(
+        class  => ref($old),
+        pk_str => $old->pk_str,
+        old    => $self->_parse_db_config($old),
+        new    => $self->_parse_db_config($new),
+    )
 }
 
 sub _parse_db_config {
@@ -623,6 +691,20 @@ sub _parse_db_config {
     }
     # p(%data);
     return \%data;
+}
+
+#############################################################################
+
+package MT::ConvertDB::ClassMgr::Bob::Job;
+use MT::ConvertDB::ToolSet;
+extends 'MT::ConvertDB::ClassMgr::Generic';
+
+sub report_diff {
+    my $self = shift;
+    # last_run and next_run are reported as migration errors
+    # if RPT is run after migration but before verification
+    return $self->SUPER::report_diff(@_)
+        unless $_[0]->{key} =~ m{(next|last)_run};
 }
 
 #############################################################################
