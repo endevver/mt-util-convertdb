@@ -552,58 +552,58 @@ before save => sub { $_[1]->visible(1) unless defined $_[1]->visible };
 
 #############################################################################
 
-package MT::ConvertDB::ClassMgr::Category;
-use MT::ConvertDB::ToolSet;
-extends 'MT::ConvertDB::ClassMgr::Generic';
-use vars qw( $l4p );
-
-has category_parents => (
-    is => 'ro',
-    isa => quote_sub(q(ref $_[0] eq 'HASH' or die 'category_parents is not a HASH ref'; )),
-    default => sub { {} },
-);
-
-before save => sub {
-    my ( $self, $obj, $metadata ) = @_;
-    ###l4p $l4p ||= get_logger(); $l4p->trace();
-
-    my $object_keys = $self->object_keys;
-
-    ## Look for duplicate category names, because
-    ## we have uniqueness constraints in the DB.
-    my $key = lc($obj->label) . $obj->blog_id;
-    if ($object_keys->{$key}++) {
-        print "        Found duplicate category label '" .
-              $obj->label;
-        $obj->label($obj->label . ' ' . $object_keys->{$key});
-        print "'; renaming to '" . $obj->label . "'\n";
-    }
-    # save the parent value for assignment at the end
-    if ($obj->parent) {
-        my $cat_parent = $self->category_parents;
-        $cat_parent->{$obj->id} = $obj->parent;
-        $obj->parent(0);
-    }
-};
-
-sub post_migrate {
-    my $self = shift;
-    ###l4p $l4p ||= get_logger(); $l4p->trace(1);
-    # fix up the category parents
-    # $self->reset_object_drivers($obj);  ### FIXME Reset object drivers?
-    my $cat_parent = $self->category_parents;
-    foreach my $id (keys %$cat_parent) {
-        my $cat = MT::Category->load($id);
-        $cat->parent( $cat_parent->{$id} );
-        $cat->save;
-    }
-}
-
-#############################################################################
-
-package MT::ConvertDB::ClassMgr::Folder;
-use MT::ConvertDB::ToolSet;
-extends 'MT::ConvertDB::ClassMgr::Category';
+# package MT::ConvertDB::ClassMgr::Category;
+# use MT::ConvertDB::ToolSet;
+# extends 'MT::ConvertDB::ClassMgr::Generic';
+# use vars qw( $l4p );
+#
+# has category_parents => (
+#     is => 'ro',
+#     isa => quote_sub(q(ref $_[0] eq 'HASH' or die 'category_parents is not a HASH ref'; )),
+#     default => sub { {} },
+# );
+#
+# before save => sub {
+#     my ( $self, $obj, $metadata ) = @_;
+#     ###l4p $l4p ||= get_logger(); $l4p->trace();
+#
+#     my $object_keys = $self->object_keys;
+#
+#     ## Look for duplicate category names, because
+#     ## we have uniqueness constraints in the DB.
+#     my $key = lc($obj->label) . $obj->blog_id;
+#     if ($object_keys->{$key}++) {
+#         print "        Found duplicate category label '" .
+#               $obj->label;
+#         $obj->label($obj->label . ' ' . $object_keys->{$key});
+#         print "'; renaming to '" . $obj->label . "'\n";
+#     }
+#     # save the parent value for assignment at the end
+#     if ($obj->parent) {
+#         my $cat_parent = $self->category_parents;
+#         $cat_parent->{$obj->id} = $obj->parent;
+#         $obj->parent(0);
+#     }
+# };
+#
+# sub post_migrate {
+#     my $self = shift;
+#     ###l4p $l4p ||= get_logger(); $l4p->trace(1);
+#     # fix up the category parents
+#     # $self->reset_object_drivers($obj);  ### FIXME Reset object drivers?
+#     my $cat_parent = $self->category_parents;
+#     foreach my $id (keys %$cat_parent) {
+#         my $cat = MT::Category->load($id);
+#         $cat->parent( $cat_parent->{$id} );
+#         $cat->save;
+#     }
+# }
+#
+# #############################################################################
+#
+# package MT::ConvertDB::ClassMgr::Folder;
+# use MT::ConvertDB::ToolSet;
+# extends 'MT::ConvertDB::ClassMgr::Category';
 
 #############################################################################
 
