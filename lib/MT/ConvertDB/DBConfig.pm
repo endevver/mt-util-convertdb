@@ -237,7 +237,7 @@ sub use {
 }
 
 sub count              { shift; shift->count(@_)              }
-sub meta_count         { shift; shift->count(@_)              }
+sub meta_count         { shift; shift->meta_count(@_)         }
 sub load               { shift; shift->load(@_)               }
 sub load_object        { shift; shift->load_object(@_)        }
 sub load_iter          { shift; shift->load_iter(@_)          }
