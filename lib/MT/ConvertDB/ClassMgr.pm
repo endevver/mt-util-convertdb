@@ -436,7 +436,7 @@ sub _object_diff {
         }
 
         $diff
-            && $self->report_diff( %d, diff => $diff );
+            && $self->report_diff( %d, key => $k, diff => $diff );
     }
 }
 
