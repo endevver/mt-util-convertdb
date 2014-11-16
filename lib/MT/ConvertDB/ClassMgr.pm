@@ -428,9 +428,11 @@ sub _object_diff {
             $diff = DBI::data_diff( $old, $new )
         }
         else {
-            $l4p->warn('Using Test::Deep::NoTest::eq_deeply for comparison');
+            $l4p->warn( 'Using Test::Deep::NoTest::eq_deeply for '
+                      . $d{class}.' object comparison.');
             require Test::Deep::NoTest;
-            $diff = Test::Deep::NoTest::eq_deeply( $old, $new ) ? '' : 1
+            import Test::Deep::NoTest;
+            $diff = eq_deeply( $old, $new ) ? '' : 1
         }
 
         $diff
