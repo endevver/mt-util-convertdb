@@ -142,20 +142,14 @@ sub _parse_child_classes {
 #############################################################################
 
 package MT::ConvertDB::Role::SimpleSave {
-
     use Moo::Role;
-
-    sub save_method {
-        sub { shift; shift->save }
-    }
+    sub save_method { sub { shift; shift->save } }
 }
 
 #############################################################################
 
 package MT::ConvertDB::Role::DefaultSave {
-
     use Moo::Role;
-
     sub save_method {
         return sub {
             my ($self, $obj) = @_;
@@ -412,24 +406,33 @@ sub object_diff {
     return 1;
 }
 
+=head2 _object_diff( old => \%old, new => \%new, class => $class, pk_str => $pk_str )
+
+This method is responsible for iterating over two possibly-nested hashes in
+order to extract values for comparison.  All hash/array references are recursively
+dereferenced but code references and blessed objects are ignored.
+
+=cut
 sub _object_diff {
     my $self = shift;
-    $self->_object_diff_data(@_);
-}
-
-sub _object_diff_data {
-    my $self = shift;
     my %d    = @_;
+
     foreach my $k ( keys %{ $d{old} } ) {
-        ###l4p $l4p->info(join(' ',
+        ###l4p $l4p->debug(join(' ',
         ###l4p     'Comparing', $d{class}, ($d{pk_str} ? $d{pk_str} : ()), $k, 'meta values'));
+        my $diff;
+        my $old = $d{old}->{$k} // '';
+        my $new = $d{new}->{$k} // '';
 
-        my $old = $d{old}->{$k};
-        my $new = $d{new}->{$k};
+        if ( ! ref $old ) {
+            $diff = DBI::data_diff( $old, $new )
+        }
+        else {
+            $l4p->warn('Using Test::Deep::NoTest::eq_deeply for comparison');
+            require Test::Deep::NoTest;
+            $diff = Test::Deep::NoTest::eq_deeply( $old, $new ) ? '' : 1
+        }
 
-        use Test::Deep::NoTest;
-        my $diff = ref($old) ? ( eq_deeply( $old, $new ) ? '' : 1 )
-                             :   DBI::data_diff( $old, $new );
         $diff
             && $self->report_diff( %d, diff => $diff );
     }
