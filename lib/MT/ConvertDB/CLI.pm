@@ -31,6 +31,12 @@ option classes => (
     longdoc => '',
 );
 
+option show_counts => (
+    is     => 'ro',
+    doc => '',
+    longdoc => '',
+);
+
 option skip_classes => (
     is     => 'ro',
     format => 's@',
@@ -176,7 +182,10 @@ sub run {
     try {
         local $SIG{__WARN__} = sub { $l4p->warn($_[0]) };
 
-        if ( $self->resave_source ) {
+        if ( $self->show_counts ) {
+            $self->do_table_counts();
+        }
+        elsif ( $self->resave_source ) {
             $self->do_resave_source();
         }
         elsif ( $self->migrate || $self->verify  ) {
