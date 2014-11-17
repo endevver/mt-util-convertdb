@@ -17,22 +17,28 @@ has app_class => (
 );
 
 has file => (
-    is        => 'ro',
-    coerce    => quote_sub(q( path($_[0])->absolute )),
-    isa       => quote_sub(q( my ($v) = @_; defined($v) && Scalar::Util::blessed($v) && $v->isa('Path::Tiny') && $v->is_file or die "file is not a valid config file path: ".$v )),
+    is     => 'ro',
+    coerce => quote_sub(q( path($_[0])->absolute )),
+    isa    => quote_sub(
+        q( my ($v) = @_; defined($v) && Scalar::Util::blessed($v) && $v->isa('Path::Tiny') && $v->is_file or die "file is not a valid config file path: ".$v )
+    ),
     predicate => 1,
 );
 
 has app => (
-    is      => 'lazy',
-    isa     => quote_sub(q( my ($v) = @_; Scalar::Util::blessed($v) && $v->isa('MT') or die "Bad app: ".p($v) )),
+    is  => 'lazy',
+    isa => quote_sub(
+        q( my ($v) = @_; Scalar::Util::blessed($v) && $v->isa('MT') or die "Bad app: ".p($v) )
+    ),
     trigger => 1,
 );
 
 has driver => (
-    is        => 'lazy',
-    isa       => quote_sub(q( my ($v) = @_; Scalar::Util::blessed($v) &&
-$v->isa('MT::ObjectDriver::Driver::DBI') or die "Bad driver: ".p($v) )),
+    is  => 'lazy',
+    isa => quote_sub(
+        q( my ($v) = @_; Scalar::Util::blessed($v) &&
+$v->isa('MT::ObjectDriver::Driver::DBI') or die "Bad driver: ".p($v) )
+    ),
     predicate => 1,
 );
 
@@ -51,7 +57,7 @@ sub BUILDARGS {
     unshift @args, "file" if @args % 2 == 1;
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info('########## Instantiation for config '.$_[1] );
-    return { @args };
+    return {@args};
 }
 
 sub BUILD {
@@ -65,8 +71,8 @@ sub BUILD {
 }
 
 sub _trigger_read_only {
-    my $self  = shift;
-    my $val   = shift;
+    my $self = shift;
+    my $val  = shift;
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info(sprintf('Driver for %s is %s', $self->driver->{dsn},
     ###l4p     $val ? 'READ ONLY' : 'WRITEABLE' ));
@@ -82,13 +88,13 @@ sub _build_app {
     ###l4p $l4p->info('A previous config existed: '.$MT::ConfigMgr::cfg) if $MT::ConfigMgr::cfg;
 
     my $mt = try {
-        local $SIG{__WARN__} = sub {};
+        local $SIG{__WARN__} = sub { };
         no warnings 'once';
         use_module($app_class);
         undef $MT::ConfigMgr::cfg;
         undef $MT::mt_inst;
         $ENV{MT_CONFIG} = $MT::CFG_FILE = $cfg_file;
-        $MT::MT_DIR     = $MT::APP_DIR  = $MT::CFG_DIR = $ENV{MT_HOME};
+        $MT::MT_DIR = $MT::APP_DIR = $MT::CFG_DIR = $ENV{MT_HOME};
         MT->set_instance( bless {}, $app_class );
     }
     catch {
@@ -110,10 +116,11 @@ sub _build_app {
 
     ## Initialize the language to the default in case any errors occur in
     ## the rest of the initialization process.
-    $mt->init_config({ Config => $cfg_file }) or return;
+    $mt->init_config( { Config => $cfg_file } ) or return;
 
     $l4p->logcroak('Config is not defined!') unless $mt->{cfg};
-    $l4p->logcroak("Config is wrong! \$cfg_file=$cfg_file, \$mt->{cfg_file}=".$mt->{cfg_file})
+    $l4p->logcroak( "Config is wrong! \$cfg_file=$cfg_file, \$mt->{cfg_file}="
+            . $mt->{cfg_file} )
         unless $mt->{cfg_file} eq $cfg_file->absolute;
 
     return $mt;
@@ -137,9 +144,9 @@ sub _build_driver {
 
     # Avoid ObjectDriverFactory->instance and force the driver to
     # use the fallback non-caching DBI driver for this config
-    my $pwd    = $cfg->DBPassword;
-    my $uname  = $cfg->DBUser;
-    my $dbd    = MT::ObjectDriverFactory->dbd_class;
+    my $pwd   = $cfg->DBPassword;
+    my $uname = $cfg->DBUser;
+    my $dbd   = MT::ObjectDriverFactory->dbd_class;
 
     my $driver = MT::ObjectDriver::Driver::DBI->new(
         dbd       => $dbd,
@@ -152,7 +159,8 @@ sub _build_driver {
     ###l4p $l4p->info('Objectdriver configured: '.$driver->{dsn});
     no warnings 'once';
     push( @MT::ObjectDriverFactory::drivers, $driver );
-    return ( $MT::Object::DRIVER = $MT::ObjectDriverFactory::DRIVER = $driver );
+    return ( $MT::Object::DRIVER = $MT::ObjectDriverFactory::DRIVER
+            = $driver );
 }
 
 sub finish_init {
@@ -160,16 +168,16 @@ sub finish_init {
     my $mt   = $self->app;
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info('Finishing initialization');
-    my @app_args = my(%param) = ( Config => $self->file.'' );
+    my @app_args = my (%param) = ( Config => $self->file . '' );
 
     $mt->init_lang_defaults(@app_args)
         or confess('init_lang_defaults returned false');
-    $mt->config->read_config($self->file);
+    $mt->config->read_config( $self->file );
     require MT::Plugin;
     $mt->init_addons(@app_args)
         or confess('init_addons returned false');
     $mt->init_config_from_db( \%param )
-        or confess('init_config_from_db returned false');;
+        or confess('init_config_from_db returned false');
     $mt->init_debug_mode;
     $mt->init_plugins(@app_args)
         or confess('init_plugins returned false');
@@ -199,32 +207,37 @@ sub check_plugins {
     # Check that certain plugins are loaded:
     %MT::Plugins or $l4p->logcroak('%MT::Plugins not loaded');
 
-    exists( $MT::Plugins{$_} ) || $l4p->logcroak("$_ not loaded: ", l4mtdump([keys %MT::Plugins]))
+    exists( $MT::Plugins{$_} )
+        || $l4p->logcroak( "$_ not loaded: ",
+        l4mtdump( [ keys %MT::Plugins ] ) )
         for qw( Commercial.pack ConfigAssistant.pack );
 
     my $cpack = $MT::Plugins{'Commercial.pack'};
     $l4p->logwarn('CustomFields not loaded')
         unless $cpack
-            && exists( $cpack->{object}{customfields} )
-            && @{ $cpack->{object}{customfields} } > 0;
+        && exists( $cpack->{object}{customfields} )
+        && @{ $cpack->{object}{customfields} } > 0;
 
     # Check that certain plugins are NOT loaded
-    exists($MT::Plugins{LDAPTools}) && exists($MT::Plugins{LDAPTools}{object})
+    exists( $MT::Plugins{LDAPTools} )
+        && exists( $MT::Plugins{LDAPTools}{object} )
         and $l4p->logcroak( 'The LDAPTools plugin conflicts with this tool. '
-                          . 'Please remove it from the plugins directory '
-                          . 'and re-run');
+            . 'Please remove it from the plugins directory '
+            . 'and re-run' );
 }
 
 sub check_schema {
     my $self = shift;
     ###l4p $l4p ||= get_logger(); $l4p->info('Loading/checking database schema');
     require MT::Upgrade;
-    MT::Upgrade->do_upgrade( CLI => 1, $self->read_only ? () : ( Install => 1 ) )
-        or die MT::Upgrade->errstr;
+    MT::Upgrade->do_upgrade(
+        CLI => 1,
+        $self->read_only ? () : ( Install => 1 )
+    ) or die MT::Upgrade->errstr;
 }
 
 sub use {
-    my $self   = shift;
+    my $self = shift;
     ###l4p $l4p ||= get_logger(); $l4p->trace(1);
     no warnings 'once';
     MT->set_instance( $self->app );
@@ -234,11 +247,11 @@ sub use {
     $self;
 }
 
-sub load               { shift; shift->load(@_)               }
-sub load_object        { shift; shift->load_object(@_)        }
-sub load_iter          { shift; shift->load_iter(@_)          }
-sub load_meta          { shift; shift->load_meta(@_)          }
-sub post_migrate       { shift; shift->post_migrate(@_)       }
+sub load               { shift; shift->load(@_) }
+sub load_object        { shift; shift->load_object(@_) }
+sub load_iter          { shift; shift->load_iter(@_) }
+sub load_meta          { shift; shift->load_meta(@_) }
+sub post_migrate       { shift; shift->post_migrate(@_) }
 sub post_migrate_class { shift; shift->post_migrate_class(@_) }
 
 sub clear_counts {
@@ -263,14 +276,14 @@ sub meta_count {
 }
 
 sub table_counts {
-    my $self         = shift;
-    my $classobj     = shift;
-    my $class        = $classobj->class;
-    $self->clear_counts( $classobj );
+    my $self     = shift;
+    my $classobj = shift;
+    my $class    = $classobj->class;
+    $self->clear_counts($classobj);
 
-    my $tally        = {
-        object => $self->count( $classobj ),
-        meta   => $self->meta_count( $classobj ),
+    my $tally = {
+        object => $self->count($classobj),
+        meta   => $self->meta_count($classobj),
     };
     delete $tally->{meta} unless defined $tally->{meta};
 
@@ -279,7 +292,7 @@ sub table_counts {
     return $tally;
 }
 
-sub remove_all  {
+sub remove_all {
     my $self     = shift;
     my $classobj = shift;
     my $class    = $classobj->class;
@@ -288,10 +301,11 @@ sub remove_all  {
     # This remove_all works on the driver level so removing entries also
     # removes pages essentially wiping out the table.  Doing that twice,
     # after one of the two have been migrated yields poor results.
-    return if $self->read_only
-           || $self->ds_truncated->{ $class->datasource }++;
+    return
+        if $self->read_only
+        || $self->ds_truncated->{ $class->datasource }++;
 
-    $self->clear_counts( $classobj );
+    $self->clear_counts($classobj);
     return $classobj->remove_all();
 }
 
@@ -300,7 +314,7 @@ sub save {
     my ( $classobj, $obj, $meta ) = @_;
     ###l4p $l4p ||= get_logger();
 
-    return $classobj->save( $obj ) unless $self->read_only;
+    return $classobj->save($obj) unless $self->read_only;
 
     ###l4p $l4p->debug(sprintf('FAKE saving %s%s',
     ###l4p     $classobj->class,
@@ -309,12 +323,12 @@ sub save {
 
 sub label {
     my $self = shift;
-    join(' ', '[',
-              ($self->has_file      ? $self->file->basename : ()),
-              ($self->has_driver    ? $self->driver->{dsn}  : ()),
-              ($self->read_only     ? 'READ ONLY' : 'WRITEABLE' ),
-              ']'
-    );
+    join( ' ',
+        '[',
+        ( $self->has_file   ? $self->file->basename : () ),
+        ( $self->has_driver ? $self->driver->{dsn}  : () ),
+        ( $self->read_only  ? 'READ ONLY'           : 'WRITEABLE' ),
+        ']' );
 }
 
 1;

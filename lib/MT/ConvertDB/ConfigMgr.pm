@@ -4,24 +4,27 @@ use MT::ConvertDB::ToolSet;
 use vars qw( $l4p );
 
 has read_only => (
-    is      => 'rw',
+    is       => 'rw',
     required => 1,
     trigger  => 1,
 );
 
 has old_config => (
-    is        => 'lazy',
-    init_arg  => 'old',
-    coerce    => quote_sub(q( use_module('MT::ConvertDB::DBConfig')->new( $_[0] ); )),
+    is       => 'lazy',
+    init_arg => 'old',
+    coerce =>
+        quote_sub(q( use_module('MT::ConvertDB::DBConfig')->new( $_[0] ); )),
     predicate => 1,
     default   => './mt-config.cgi',
 );
 
 has new_config => (
-    is        => 'ro',
-    lazy      => 1,
-    init_arg  => 'new',
-    coerce    => quote_sub(q( use_module('MT::ConvertDB::DBConfig')->new( file => $_[0], read_only => 0 ); )),
+    is       => 'ro',
+    lazy     => 1,
+    init_arg => 'new',
+    coerce   => quote_sub(
+        q( use_module('MT::ConvertDB::DBConfig')->new( file => $_[0], read_only => 0 ); )
+    ),
     required  => 1,
     predicate => 1,
 );
@@ -54,29 +57,29 @@ sub BUILD {
     *olddb = \&use_old_database;
     *newdb = \&use_new_database;
 }
-sub post_migrate_class { shift->newdb->post_migrate_class( shift ) }
+sub post_migrate_class { shift->newdb->post_migrate_class(shift) }
 
 sub post_migrate {
     my $self     = shift;
     my $classobj = shift;
 
-    # Re-load and re-save all blogs/websites to ensure all custom fields migrated
+ # Re-load and re-save all blogs/websites to ensure all custom fields migrated
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info('Reloading and resaving all blogs/websites to get full metadata');
-    my @cobjs   = map { $classobj->class_object($_) } qw( MT::Blog MT::Website );
-    foreach my $cobj ( @cobjs ) {
-        my $iter = $self->olddb->load_iter( $cobj );
-        while (my $obj = $iter->()) {
+    my @cobjs
+        = map { $classobj->class_object($_) } qw( MT::Blog MT::Website );
+    foreach my $cobj (@cobjs) {
+        my $iter = $self->olddb->load_iter($cobj);
+        while ( my $obj = $iter->() ) {
             my $meta = $self->olddb->load_meta( $cobj, $obj );
             $self->newdb->save( $cobj, $obj, $meta );
             $self->use_old_database();
         }
     }
     $self->use_new_database();
-    MT->instance->{cfg}->SchemaVersion(MT->schema_version(), 1);
+    MT->instance->{cfg}->SchemaVersion( MT->schema_version(), 1 );
     MT->instance->{cfg}->save_config();
 }
-
 
 sub use_old_database {
     ###l4p $l4p ||= get_logger(); $l4p->debug('Switching to old database');
@@ -94,17 +97,18 @@ sub check_configs {
     my $orig = $self->old_config;
     my $new  = $self->new_config;
 
-    die "Config files are the same: ".$orig->file
+    die "Config files are the same: " . $orig->file
         if $orig->file eq $new->file;
 
-    die "App config files are the same: ".$orig->app->{cfg_file}
+    die "App config files are the same: " . $orig->app->{cfg_file}
         if $orig->app->{cfg_file} eq $new->app->{cfg_file};
 
-    die "ObjectDrivers are the same: ".$orig->driver->{dsn}
+    die "ObjectDrivers are the same: " . $orig->driver->{dsn}
         if $orig->driver->{dsn} eq $new->driver->{dsn};
 
     no warnings 'once';
-    $l4p->debug('@MT::ObjectDriverFactory::drivers: '.p(@MT::ObjectDriverFactory::drivers));
+    $l4p->debug( '@MT::ObjectDriverFactory::drivers: '
+            . p(@MT::ObjectDriverFactory::drivers) );
 }
 
 1;
