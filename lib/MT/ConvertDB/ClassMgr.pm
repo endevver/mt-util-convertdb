@@ -232,9 +232,8 @@ sub meta_count {
 sub remove_all {
     my $self  = shift;
     my $class = shift || $self->class;
-    my $count = $self->count($class);
     ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->info(sprintf('Removing %d %s objects (%s)', $count, $class, ref($self) ));
+    ###l4p $l4p->info(sprintf('Removing all %s objects (%s)', $class, ref($self) ));
 
     $self->remove_all( $class->meta_pkg ) if $class->meta_pkg;
 
@@ -254,9 +253,8 @@ sub load {
     my $self  = shift;
     my ($terms, $args) = @_;
     my $class = $self->class;
-    my $count = $self->count + $self->meta_count;
     ###l4p $l4p ||= get_logger();
-    # ##l4p $l4p->info(sprintf('Loading %d %s objects (%s)', $count, $class, ref($self) ));
+    ###l4p $l4p->debug(sprintf('Loading %s objects (%s)', $class, ref($self) ));
     $self->class->load($terms, $args)
 }
 
@@ -264,9 +262,8 @@ sub load_iter {
     my $self = shift;
     my ($terms, $args) = @_;
     my $class = $self->class;
-    my $count = $self->count + $self->meta_count;
     ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->info(sprintf('Getting iter for %d %s objects (%s)', $count, $class, ref($self) ));
+    ###l4p $l4p->info(sprintf('Getting iter for %s objects (%s)', $class, ref($self) ));
     my $iter = $self->class->load_iter($terms, $args)
 }
 
@@ -465,6 +462,7 @@ sub report_diff {
 
 sub post_migrate_class {}
 
+### FIXME full_record_counts should be taken out of this class and put into DBConfig
 sub full_record_counts {
     my $self = shift;
     my $c    = $self->class;
