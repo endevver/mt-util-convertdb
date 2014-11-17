@@ -212,8 +212,8 @@ sub reset_object_drivers {
 
 sub count {
     my $self  = shift;
-    my $class = shift || $self->class;
     my ($terms, $args) = @_;
+    my $class = $self->class;
     $self->reset_object_drivers();
     $class->_pre_search_scope_terms_to_class(($terms ||= {}), $args)
         unless UNIVERSAL::isa( $class, 'MT::Object::Meta');
@@ -223,9 +223,8 @@ sub count {
 sub meta_count {
     my $self  = shift;
     my $class = $self->class;
-    return 0 unless $class->meta_pkg && $class->has_meta;
+    return unless $class->meta_pkg && $class->has_meta;
     $self->reset_object_drivers();
-    ### FIXME meta_count does not take classed objects into account so both MT::Blog/Website report ALL of the objects in the meta table.  Grrrr.
     return ($class->meta_pkg->count() || 0);
 }
 
@@ -461,16 +460,6 @@ sub report_diff {
 }
 
 sub post_migrate_class {}
-
-### FIXME full_record_counts should be taken out of this class and put into DBConfig
-sub full_record_counts {
-    my $self = shift;
-    my $c    = $self->class;
-    no warnings 'once';
-    my $tally = { obj  => $self->count(), meta => $self->meta_count() };
-    $tally->{total} = reduce { $a + $tally->{$b} } qw( 0 obj meta );
-    return $tally;
-}
 
 sub primary_key_to_terms { $_[1]->primary_key_to_terms }
 

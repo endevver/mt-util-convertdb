@@ -247,22 +247,43 @@ sub load_iter          { shift; shift->load_iter(@_)          }
 sub load_meta          { shift; shift->load_meta(@_)          }
 sub post_migrate       { shift; shift->post_migrate(@_)       }
 sub post_migrate_class { shift; shift->post_migrate_class(@_) }
-sub full_record_counts { shift; shift->full_record_counts(@_) }
 
-sub clear_counts { delete shift()->obj_counts->{shift()->class} }
+sub clear_counts {
+    my $self     = shift;
+    my $classobj = shift;
+    my $ds       = $classobj->class->datasource;
+    delete $self->obj_counts->{$ds} if $self->obj_counts->{$ds};
+}
 
 sub count {
     my $self     = shift;
     my $classobj = shift;
-    return ( $self->obj_counts->{$classobj->class}{object}
-                //= $classobj->count(@_) );
+    my $ds       = $classobj->class->datasource;
+    return $self->obj_counts->{$ds}{object} //= $classobj->count(@_);
 }
 
 sub meta_count {
-    my $self = shift;
+    my $self     = shift;
     my $classobj = shift;
-    return ( $self->obj_counts->{$classobj->class}{meta}
-                //= $classobj->meta_count(@_) );
+    my $ds       = $classobj->class->datasource;
+    return $self->obj_counts->{$ds}{meta} //= $classobj->meta_count(@_);
+}
+
+sub table_counts {
+    my $self         = shift;
+    my $classobj     = shift;
+    my $class        = $classobj->class;
+    $self->clear_counts( $classobj );
+
+    my $tally        = {
+        object => $self->count( $classobj ),
+        meta   => $self->meta_count( $classobj ),
+    };
+    delete $tally->{meta} unless defined $tally->{meta};
+
+    $tally->{total} += $_ for values %$tally;
+
+    return $tally;
 }
 
 sub remove_all  {

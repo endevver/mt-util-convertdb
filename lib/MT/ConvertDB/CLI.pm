@@ -88,6 +88,13 @@ has progressbar => (
 has total_objects => (
     is        => 'rw',
     predicate => 1,
+    default   => 0,
+);
+
+has table_counts => (
+    is        => 'lazy',
+    clearer   => 1,
+    predicate => 1,
 );
 
 sub _build_classmgr {
@@ -123,7 +130,8 @@ my ($finish, $count, $next_update) = ( 0, 0, 0 );
 sub _build_progressbar {
     my $self = shift;
     ###l4p $l4p ||= get_logger();
-    die "Progress bar requires total_objects count" unless $self->total_objects;
+    $self->table_counts() unless $self->has_table_counts;
+
     my $p = Term::ProgressBar->new({
         name  => 'Progress',
         count => $self->total_objects,
@@ -134,6 +142,28 @@ sub _build_progressbar {
     ###l4p $l4p->info(sprintf('Initialized progress bar with %d objects: ',
     ###l4p              $self->total_objects), l4mtdump($p));
     $p;
+}
+
+sub _build_table_counts {
+    my $self = shift;
+    my $cfgmgr     = $self->cfgmgr;
+    my $classmgr   = $self->classmgr;
+    my $class_objs = $self->class_objects;
+
+    my $total = 0;
+    my $cnts  = {};
+    for my $which (qw( old new )) {
+        my $db = $which eq 'old' ? $cfgmgr->olddb : $cfgmgr->newdb;
+        foreach my $classobj ( @$class_objs ) {
+            my $ds = $classobj->class->datasource;
+            unless ( $cnts->{$ds}{$which} ) {
+                $cnts->{$ds}{$which} = $db->table_counts( $classobj );
+                $total              += $cnts->{$ds}{$which}{total};
+            }
+        }
+    }
+    $self->total_objects( $total );
+    $cnts;
 }
 
 sub run {
@@ -166,6 +196,14 @@ sub run {
         $l4p->error("An error occurred: $_");
         exit 1;
     };
+}
+
+sub do_table_counts {
+    my $self = shift;
+    $self->clear_table_counts();
+    my $cnt = $self->table_counts;
+    $self->progress( 'Table counts: '.p($cnt));
+    $cnt;
 }
 
 sub do_resave_source {
@@ -208,11 +246,15 @@ sub do_migrate_verify {
     my $class_objs = $self->class_objects;
     ###l4p $l4p ||= get_logger();
 
+    if ( $self->migrate ) {
+        ###l4p $l4p->info( "Removing all rows from tables in new database" );
+        $cfgmgr->newdb->remove_all( $_ ) foreach @$class_objs;
+        $self->do_table_counts();
+    }
+
+
     foreach my $classobj ( @$class_objs ) {
-
         my $class = $classobj->class;
-
-        $cfgmgr->newdb->remove_all( $classobj ) if $self->migrate;
 
         my $iter = $cfgmgr->olddb->load_iter( $classobj );
 
@@ -273,20 +315,17 @@ sub verify_record_counts {
     my $class_objs = $self->class_objects;
     ###l4p $l4p ||= get_logger();
 
-    foreach my $classobj ( @$class_objs ) {
-        my $class    = $classobj->class;
+    my $cnts = $self->do_table_counts();
 
-        my $old = $cfgmgr->olddb->full_record_counts($classobj);
-
-        my $new = $cfgmgr->newdb->full_record_counts($classobj);
-
-        if ( $old->{total} == $new->{total} ) {
-            $self->progress('Object counts match for '.$classobj->class);
+    foreach my $ds ( keys %$cnts ) {
+        my ( $old, $new ) = map { $cnts->{$ds}{$_}{total} } qw( old new );
+        if ( $old == $new ) {
+            $self->progress("Object counts match for $ds ");
         }
         else {
             ($l4p ||= get_logger)->error(sprintf(
-                'Object count mismatch for %s',
-                $classobj->class ), l4mtdump({ old => $old, new => $new }));
+                'Object count mismatch for %s ',
+                $ds ), l4mtdump( $cnts->{$ds} ));
         }
     }
 }
