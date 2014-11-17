@@ -125,8 +125,6 @@ sub _build_class_objects {
     ];
 }
 
-my ($finish, $count, $next_update) = ( 0, 0, 0 );
-
 sub _build_progressbar {
     my $self = shift;
     ###l4p $l4p ||= get_logger();
@@ -175,8 +173,6 @@ sub run {
 
     $self->dry_run(1) unless $self->migrate;
 
-    $finish = $self->update_count( $count => $class_objs );
-
     try {
         local $SIG{__WARN__} = sub { $l4p->warn($_[0]) };
 
@@ -187,7 +183,8 @@ sub run {
             $self->do_migrate_verify()
         }
         else {
-            $self->progress( "Class initialization done for $finish objects. "
+            $self->progress( 'Class initialization done for '
+                           . Sself->total_objects.' objects. '
                            . 'Exiting without --migrate or --verify' );
         }
         $self->progress('Script complete. All went well.');
@@ -213,7 +210,10 @@ sub do_resave_source {
     my $class_objs = $self->class_objects;
     ###l4p $l4p ||= get_logger();
 
-    $self->progress("Resaving $finish source objects.");
+    my $count       = 0;
+    my $next_update = $self->progressbar->update( 0 );
+
+    ###l4p $self->progress('Resaving '.$self->total_objects.' source objects.');
 
     $cfgmgr->old_config->read_only(0);
 
@@ -228,15 +228,15 @@ sub do_resave_source {
                 or die "Could not save ".$obj->type." object: ".$obj->errstr;
 
             $count += 1 + scalar(keys %$meta);
-            $next_update = $self->update_count($count)
+            $next_update = $self->progressbar->update( $count )
               if $count >= $next_update;    # efficiency
         }
     }
     $cfgmgr->old_config->read_only(1);
 
-    $self->update_count($finish);
-
     $self->progress('Resaved all objects!');
+
+    $self->progressbar->update( $self->total_objects );
 }
 
 sub do_migrate_verify {
@@ -252,17 +252,19 @@ sub do_migrate_verify {
         $self->do_table_counts();
     }
 
+    my $count       = 0;
+    my $next_update = $self->progressbar->update( 0 );
 
     foreach my $classobj ( @$class_objs ) {
         my $class = $classobj->class;
 
+        ###l4p $self->progress(sprintf('%s %s objects',
+        ###l4p     ($self->migrate ? 'Migrating' : 'Verifying'), $class ));
         my $iter = $cfgmgr->olddb->load_iter( $classobj );
-
-        $self->progress('Processing '.$classobj->class.' objects');
         while (my $obj = $iter->()) {
 
             unless (defined($obj)) {
-                $l4p->error($classobj->class." object not defined!");
+                $l4p->error($class." object not defined!");
                 next;
             }
 
@@ -275,12 +277,11 @@ sub do_migrate_verify {
                 if $self->verify;
 
             $count += 1 + scalar(keys %$meta);
-            $next_update = $self->update_count($count)
+            $next_update = $self->progressbar->update($count)
               if $count >= $next_update;    # efficiency
 
             $cfgmgr->use_old_database();
         }
-        ###l4p $l4p->info('Processing '.$classobj->class.' objects complete');
 
         $cfgmgr->post_migrate_class( $classobj ) unless $self->dry_run;
     }
@@ -289,7 +290,7 @@ sub do_migrate_verify {
 
     $self->verify_record_counts() if $self->verify;
 
-    $self->update_count($finish);
+    $self->progressbar->update( $self->total_objects );
 }
 
 sub verify_migration {
@@ -328,23 +329,6 @@ sub verify_record_counts {
                 $ds ), l4mtdump( $cnts->{$ds} ));
         }
     }
-}
-
-sub update_count {
-    my $self               = shift;
-    my ($cnt, $class_objs) = @_;
-    my $cfgmgr             = $self->cfgmgr;
-
-    if ( $class_objs ) { # Initialization/first call
-        $self->total_objects(
-            reduce { $a + $b }
-               map {   $cfgmgr->olddb->count($_)
-                     + $cfgmgr->olddb->meta_count($_) } @$class_objs
-        );
-        my $p = $self->progressbar();
-        return $self->total_objects;        # Return finish value
-    }
-    $self->progressbar->update( $cnt );  # Returns next update value
 }
 
 sub progress {
