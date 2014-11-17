@@ -41,6 +41,11 @@ has obj_summary => (
     default => sub { {} },
 );
 
+has obj_counts => (
+    is      => 'ro',
+    default => sub { {} },
+);
+
 sub BUILDARGS {
     my ( $class, @args ) = @_;
     unshift @args, "file" if @args % 2 == 1;
@@ -236,8 +241,6 @@ sub use {
     $self;
 }
 
-sub count              { shift; shift->count(@_)              }
-sub meta_count         { shift; shift->meta_count(@_)         }
 sub load               { shift; shift->load(@_)               }
 sub load_object        { shift; shift->load_object(@_)        }
 sub load_iter          { shift; shift->load_iter(@_)          }
@@ -246,6 +249,22 @@ sub post_migrate       { shift; shift->post_migrate(@_)       }
 sub post_migrate_class { shift; shift->post_migrate_class(@_) }
 sub full_record_counts { shift; shift->full_record_counts(@_) }
 sub object_summary     { shift->obj_summary                   }
+
+sub clear_counts { delete shift()->obj_counts->{shift()->class} }
+
+sub count {
+    my $self     = shift;
+    my $classobj = shift;
+    return ( $self->obj_counts->{$classobj->class}{object}
+                //= $classobj->count(@_) );
+}
+
+sub meta_count {
+    my $self = shift;
+    my $classobj = shift;
+    return ( $self->obj_counts->{$classobj->class}{meta}
+                //= $classobj->meta_count(@_) );
+}
 
 sub remove_all  {
     my $self     = shift;
