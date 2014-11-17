@@ -208,8 +208,25 @@ sub do_table_counts {
     my $self = shift;
     $self->clear_table_counts();
     my $cnt = $self->table_counts;
-    $self->progress( 'Table counts: '.p($cnt));
-    $cnt;
+
+    use Text::Table;
+    my $tb = Text::Table->new(
+        "Data source", "Status", "Total Old", "Total New", "Objects Old", "Objects New", "Meta Old", "Meta New"
+    );
+    foreach my $ds ( sort keys $cnt ) {
+        my $old = $cnt->{$ds}{old};
+        my $new = $cnt->{$ds}{new};
+        my @data;
+        my $mismatch = 0;
+        foreach my $type (qw( total object meta )) {
+            $_->{$type} //= 0 foreach ($old, $new);
+            $mismatch++ if $old->{$type} != $new->{$type};
+            push(@data, $old->{$type}, $new->{$type} )
+        }
+        $tb->add( "mt_$ds", ( $mismatch ? 'NOT OK' : 'OK' ), @data );
+    }
+    $self->progress( "Table counts:\n$tb" );
+    return $cnt;
 }
 
 sub do_resave_source {
