@@ -36,12 +36,12 @@ $v->isa('MT::ObjectDriver::Driver::DBI') or die "Bad driver: ".p($v) )),
     predicate => 1,
 );
 
-has obj_summary => (
+has obj_counts => (
     is      => 'ro',
     default => sub { {} },
 );
 
-has obj_counts => (
+has ds_truncated => (
     is      => 'ro',
     default => sub { {} },
 );
@@ -248,7 +248,6 @@ sub load_meta          { shift; shift->load_meta(@_)          }
 sub post_migrate       { shift; shift->post_migrate(@_)       }
 sub post_migrate_class { shift; shift->post_migrate_class(@_) }
 sub full_record_counts { shift; shift->full_record_counts(@_) }
-sub object_summary     { shift->obj_summary                   }
 
 sub clear_counts { delete shift()->obj_counts->{shift()->class} }
 
@@ -279,11 +278,6 @@ sub save {
     my ( $classobj, $obj, $meta ) = @_;
     ###l4p $l4p ||= get_logger();
 
-    my $object_summary = $self->obj_summary;
-    $object_summary->{objects}{$classobj->class}++;
-    $object_summary->{meta}{$classobj->class} += keys %$meta
-        if $obj->has_meta && %$meta;
-
     ### FIXME --verify with no migrate yields errors
     # I THINK the lack of pre/post save routines are making the data inconsistent
     return $classobj->save( $obj ) unless $self->read_only;
@@ -302,6 +296,5 @@ sub label {
               ']'
     );
 }
-
 
 1;

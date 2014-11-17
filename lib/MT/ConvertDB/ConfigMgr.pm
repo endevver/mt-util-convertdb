@@ -46,8 +46,6 @@ sub BUILD {
     *olddb = \&use_old_database;
     *newdb = \&use_new_database;
 }
-sub object_summary  { shift->new_config->object_summary() }
-
 sub post_migrate_class { shift->newdb->post_migrate_class( shift ) }
 
 sub post_migrate {
@@ -57,11 +55,8 @@ sub post_migrate {
     # Re-load and re-save all blogs/websites to ensure all custom fields migrated
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info('Reloading and resaving all blogs/websites to get full metadata');
-    my $summary = $self->new_config->obj_summary;
     my @cobjs   = map { $classobj->class_object($_) } qw( MT::Blog MT::Website );
     foreach my $cobj ( @cobjs ) {
-        $summary->{objects}{$cobj->class} = 0;
-        $summary->{meta}{$cobj->class}    = 0;
         my $iter = $self->olddb->load_iter( $cobj );
         while (my $obj = $iter->()) {
             my $meta = $self->olddb->load_meta( $cobj, $obj );
