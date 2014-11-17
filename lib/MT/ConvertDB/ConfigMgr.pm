@@ -21,7 +21,7 @@ has new_config => (
     is        => 'ro',
     lazy      => 1,
     init_arg  => 'new',
-    coerce    => quote_sub(q( use_module('MT::ConvertDB::DBConfig')->new( $_[0] ); )),
+    coerce    => quote_sub(q( use_module('MT::ConvertDB::DBConfig')->new( file => $_[0], read_only => 0 ); )),
     required  => 1,
     predicate => 1,
 );
@@ -36,6 +36,14 @@ sub BUILD {
     my $self = shift;
     ###l4p $l4p ||= get_logger();
     $self->_trigger_read_only( $self->read_only );
+
+    for my $db ( $self->olddb, $self->newdb ) {
+        $db->check_schema();
+        my $mt = MT->instance;
+        $mt->run_callbacks( 'init_app', $mt );
+        $db->check_plugins();
+    }
+
     $self->check_configs();
     ###l4p $l4p->info('INITIALIZATION COMPLETE for '.ref($self));
     $self;

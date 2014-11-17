@@ -189,13 +189,6 @@ sub finish_init {
     $mt->{template_dir}         = 'cms';          #$app->id;
     $mt->{user_class}           = 'MT::Author';
     $mt->{plugin_template_path} = 'tmpl';
-
-    $self->check_schema();
-
-    $mt->run_callbacks( 'init_app', $mt );
-
-    $self->check_plugins();
-
 }
 
 sub check_plugins {
