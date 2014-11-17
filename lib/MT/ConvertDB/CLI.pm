@@ -53,6 +53,13 @@ option dry_run => (
     default => 0,
 );
 
+option test => (
+    is      => 'ro',
+    doc     => '',
+    longdoc => '',
+    default => 0,
+);
+
 option resave_source => (
     is      => 'ro',
     doc     => '',
@@ -230,6 +237,16 @@ sub do_table_counts {
     }
     $self->progress("Table counts:\n$tb");
     return $cnt;
+}
+
+sub do_test {
+    my $self       = shift;
+    my $cfgmgr     = $self->cfgmgr;
+    my $classmgr   = $self->classmgr;
+    my $class_objs = $self->class_objects;
+    ###l4p $l4p ||= get_logger();
+
+
 }
 
 sub do_resave_source {
