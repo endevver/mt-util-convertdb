@@ -208,17 +208,11 @@ sub do_migrate_verify {
     my $class_objs = $self->class_objects;
     ###l4p $l4p ||= get_logger();
 
-    my %truncated; # Track which tables have been truncated (see next comment)
-
     foreach my $classobj ( @$class_objs ) {
 
         my $class = $classobj->class;
 
-        # This remove_all works on the driver level so removing entries also
-        # removes pages essentially wiping out the table.  Doing that twice,
-        # after one of the two have been migrated yields poor results.
-        $cfgmgr->newdb->remove_all( $classobj )
-            if $self->migrate and ! $truncated{$classobj->class->datasource}++;
+        $cfgmgr->newdb->remove_all( $classobj ) if $self->migrate;
 
         my $iter = $cfgmgr->olddb->load_iter( $classobj );
 
