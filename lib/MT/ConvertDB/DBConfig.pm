@@ -291,13 +291,6 @@ sub remove_all  {
     return if $self->read_only
            || $self->ds_truncated->{ $class->datasource }++;
 
-    # my $count      = $self->count( $classobj );
-    # my $meta_count = $self->meta_count( $classobj );
-    # ##l4p my $msgstr = ( $self->read_only ? 'FAKE ' : '' )
-    # ##l4p            . 'Removing %d %s objects (%s)';
-    # ##l4p $count      && $l4p->info(sprintf( $msgstr, $count, $class ));
-    # ##l4p $meta_count && $l4p->info(sprintf( $msgstr, $meta_count, $class.' meta' ));
-
     $self->clear_counts( $classobj );
     return $classobj->remove_all();
 }
@@ -307,8 +300,6 @@ sub save {
     my ( $classobj, $obj, $meta ) = @_;
     ###l4p $l4p ||= get_logger();
 
-    ### FIXME --verify with no migrate yields errors
-    # I THINK the lack of pre/post save routines are making the data inconsistent
     return $classobj->save( $obj ) unless $self->read_only;
 
     ###l4p $l4p->debug(sprintf('FAKE saving %s%s',
