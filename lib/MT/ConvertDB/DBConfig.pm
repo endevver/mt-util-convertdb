@@ -289,9 +289,24 @@ sub table_counts {
 sub remove_all  {
     my $self     = shift;
     my $classobj = shift;
-    return $classobj->remove_all() unless $self->read_only;
+    my $class    = $classobj->class;
     ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->info(sprintf('FAKE Removing %s objects (%s)', $classobj->class, ref($classobj) ));
+
+    # This remove_all works on the driver level so removing entries also
+    # removes pages essentially wiping out the table.  Doing that twice,
+    # after one of the two have been migrated yields poor results.
+    return if $self->read_only
+           || $self->ds_truncated->{ $class->datasource }++;
+
+    # my $count      = $self->count( $classobj );
+    # my $meta_count = $self->meta_count( $classobj );
+    # ##l4p my $msgstr = ( $self->read_only ? 'FAKE ' : '' )
+    # ##l4p            . 'Removing %d %s objects (%s)';
+    # ##l4p $count      && $l4p->info(sprintf( $msgstr, $count, $class ));
+    # ##l4p $meta_count && $l4p->info(sprintf( $msgstr, $meta_count, $class.' meta' ));
+
+    $self->clear_counts( $classobj );
+    return $classobj->remove_all();
 }
 
 sub save {
