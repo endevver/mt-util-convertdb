@@ -261,6 +261,8 @@ sub do_find_orphans {
 
     $cfgmgr->use_old_database;
 
+    my ( %counts, %orphaned );
+
     foreach my $classobj (@$class_objs) {
         my $class = $classobj->class;
         my @isa   = try { no strict 'refs'; @{$class.'::ISA'} };
@@ -269,21 +271,33 @@ sub do_find_orphans {
         next unless MT::Meta->has_own_metadata_of($class);
         $self->progress("Checking for orphaned $class metadata...");
         try {
-            my $metaclass = $class->meta_pkg;
-            my $sql = 'select distinct '.$metaclass->datasource.'_'.$class->datasource.'_id from mt_'.$metaclass->datasource;
-            # $self->progress($sql);
-            my @obj_ids = map { $_->[0] } @{$class->driver->r_handle->selectall_arrayref($sql)};
-
-            foreach my $obj_id ( @obj_ids ) {
-                next if $class->exist({ $class->properties->{primary_key} => $obj_id });
-                $l4p->error("Found orphaned metadata for $class ID $obj_id");
+            $orphaned{$class}     = [];
+            $counts{$class}{meta_total} = $counts{$class}{meta} = $counts{$class}{meta_bad} = 0;
+            my $mclass = $class->meta_pkg;
+            my $pk     = $mclass->datasource.'_'.$class->datasource.'_id';
+            my $sql    = "select $pk, count(*) from mt_"
+                       . $mclass->datasource." group by $pk";
+            my $rows   = $class->driver->r_handle->selectall_arrayref($sql);
+            # p($rows);
+            foreach my $row ( @$rows ) {
+                my ( $obj_id, $cnt ) = @$row;
+                if ( $class->exist({ $class->properties->{primary_key} => $obj_id }) ) {
+                    $counts{$class}{meta} += $cnt;
+                }
+                else {
+                    $l4p->error("Found $cnt orphaned metadata records for $class ID $obj_id");
+                    $counts{$class}{meta_bad} += $cnt;
+                    push(@{ $orphaned{$class} }, $obj_id );
+                }
             }
+            $counts{$class}{meta_total} = $counts{$class}{meta} + $counts{$class}{meta_bad};
         }
         catch {
             $l4p->error($_);
         };
     }
-
+    p(%counts);
+    p(%orphaned);
 }
 
 sub do_test {
