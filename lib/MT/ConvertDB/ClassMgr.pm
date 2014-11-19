@@ -22,6 +22,16 @@ has object_classes => (
 
 has class_hierarchy => ( is => 'lazy', );
 
+has object_keys => (
+    is  => 'rw',
+    isa => quote_sub(
+        q(
+        ref $_[0] eq 'HASH' or die 'object_keys is not a HASH ref';
+    )
+    ),
+    default => sub { {} },
+);
+
 sub _build_include_classes {
     [ 'CustomFields::Field', 'MT::PluginData', @{ shift->object_classes } ];
 }
@@ -169,16 +179,6 @@ use List::Util qw( reduce );
 extends 'MT::ConvertDB::ClassMgr';
 with 'MT::ConvertDB::Role::DefaultSave';
 use vars qw( $l4p );
-
-has object_keys => (
-    is  => 'rw',
-    isa => quote_sub(
-        q(
-        ref $_[0] eq 'HASH' or die 'object_keys is not a HASH ref';
-    )
-    ),
-    default => sub { {} },
-);
 
 has class => (
     is  => 'ro',
