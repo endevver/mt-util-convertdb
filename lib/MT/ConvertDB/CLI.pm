@@ -67,6 +67,13 @@ option find_orphans => (
     default => 0,
 );
 
+option remove_orphans => (
+    is      => 'ro',
+    doc     => '',
+    longdoc => '',
+    default => 0,
+);
+
 option resave_source => (
     is      => 'ro',
     doc     => '',
@@ -191,7 +198,7 @@ sub run {
         if ( $self->show_counts ) {
             $self->do_table_counts();
         }
-        elsif ( $self->find_orphans ) {
+        elsif ( $self->find_orphans || $self->remove_orphans ) {
             $self->do_find_orphans();
         }
         elsif ( $self->test ) {
@@ -267,18 +274,24 @@ sub do_find_orphans {
         my $class = $classobj->class;
         my @isa   = try { no strict 'refs'; @{$class.'::ISA'} };
         next unless grep { $_ eq 'MT::Object' } @isa;
-        # $self->progress('MT::Object is in @ISA for '.$class);
+
+        # Reset object drivers for class and metaclass
+        undef $class->properties->{driver};
+        try { undef $class->meta_pkg->properties->{driver} };
+
         next unless MT::Meta->has_own_metadata_of($class);
         $self->progress("Checking for orphaned $class metadata...");
+
         try {
             $orphaned{$class}     = [];
             $counts{$class}{meta_total} = $counts{$class}{meta} = $counts{$class}{meta_bad} = 0;
-            my $mclass = $class->meta_pkg;
-            my $pk     = $mclass->datasource.'_'.$class->datasource.'_id';
+            my $mpkg = $class->meta_pkg;
+            my $pk     = $mpkg->datasource.'_'.$class->datasource.'_id';
             my $sql    = "select $pk, count(*) from mt_"
-                       . $mclass->datasource." group by $pk";
-            my $rows   = $class->driver->r_handle->selectall_arrayref($sql);
+                       . $mpkg->datasource." group by $pk";
+            my $rows   = $class->driver->rw_handle->selectall_arrayref($sql);
             # p($rows);
+
             foreach my $row ( @$rows ) {
                 my ( $obj_id, $cnt ) = @$row;
                 if ( $class->exist({ $class->properties->{primary_key} => $obj_id }) ) {
@@ -291,6 +304,15 @@ sub do_find_orphans {
                 }
             }
             $counts{$class}{meta_total} = $counts{$class}{meta} + $counts{$class}{meta_bad};
+
+            if ( $self->remove_orphans && @{ $orphaned{$class} }) {
+                # p($mpkg->driver);
+                my $dbh = $mpkg->driver->rw_handle;
+                local $dbh->{RaiseError} = 1;
+                my $meta_id = $class->datasource . '_id';
+                $self->progress("Removing orphaned metadata for $class: ");
+                $mpkg->driver->direct_remove( $mpkg, { $meta_id => $orphaned{$class} } );
+            }
         }
         catch {
             $l4p->error($_);
