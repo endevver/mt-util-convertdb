@@ -60,6 +60,13 @@ option test => (
     default => 0,
 );
 
+option find_orphans => (
+    is      => 'ro',
+    doc     => '',
+    longdoc => '',
+    default => 0,
+);
+
 option resave_source => (
     is      => 'ro',
     doc     => '',
@@ -184,6 +191,9 @@ sub run {
         if ( $self->show_counts ) {
             $self->do_table_counts();
         }
+        elsif ( $self->find_orphans ) {
+            $self->do_find_orphans();
+        }
         elsif ( $self->test ) {
             $self->do_test();
         }
@@ -239,6 +249,43 @@ sub do_table_counts {
     return $cnt;
 }
 
+sub do_find_orphans {
+    my $self       = shift;
+    my $cfgmgr     = $self->cfgmgr;
+    my $classmgr   = $self->classmgr;
+    my $class_objs = $self->class_objects;
+    ###l4p $l4p ||= get_logger();
+    require MT::Meta;
+
+    $l4p->info('Doing test');
+
+    $cfgmgr->use_old_database;
+
+    foreach my $classobj (@$class_objs) {
+        my $class = $classobj->class;
+        my @isa   = try { no strict 'refs'; @{$class.'::ISA'} };
+        next unless grep { $_ eq 'MT::Object' } @isa;
+        # $self->progress('MT::Object is in @ISA for '.$class);
+        next unless MT::Meta->has_own_metadata_of($class);
+        $self->progress("Checking for orphaned $class metadata...");
+        try {
+            my $metaclass = $class->meta_pkg;
+            my $sql = 'select distinct '.$metaclass->datasource.'_'.$class->datasource.'_id from mt_'.$metaclass->datasource;
+            # $self->progress($sql);
+            my @obj_ids = map { $_->[0] } @{$class->driver->r_handle->selectall_arrayref($sql)};
+
+            foreach my $obj_id ( @obj_ids ) {
+                next if $class->exist({ $class->properties->{primary_key} => $obj_id });
+                $l4p->error("Found orphaned metadata for $class ID $obj_id");
+            }
+        }
+        catch {
+            $l4p->error($_);
+        };
+    }
+
+}
+
 sub do_test {
     my $self       = shift;
     my $cfgmgr     = $self->cfgmgr;
@@ -246,6 +293,47 @@ sub do_test {
     my $class_objs = $self->class_objects;
     ###l4p $l4p ||= get_logger();
 
+=pod
+
+    use DBIx::Compare;
+
+    say "Instantiation....";
+    my $oDB_Comparison = db_comparison->new(
+        $cfgmgr->olddb->driver->dbh,
+        $cfgmgr->newdb->driver->dbh,
+    );
+
+    say "Verbose...";
+    $oDB_Comparison->verbose;
+
+    say "Comparing.";
+    $oDB_Comparison->compare;
+
+    say "Deep comparing.";
+    $oDB_Comparison->deep_compare;
+
+    # $oDB_Comparison->deep_compare(@aTable_Names);
+    exit;
+    p( MT::Meta->metadata_by_class('MT::Website') );
+    p( MT::Meta->has_own_metadata_of('MT::Website') );
+    p( MT::Website->meta_pkg->properties );
+    my @sites = MT->model('blog:meta')->load();
+    p(@sites);
+    exit;
+
+    # foreach my $c ( @$class_objs ) {
+    #
+    # }
+
+   my @entries = MT::Entry->load(undef, {
+        'join' => MT::Comment->join_on( 'entry_id',
+                    { blog_id => $blog_id },
+                    { 'sort' => 'created_on',
+                      direction => 'descend',
+                      unique => 1,
+                      limit => 10 } )
+    });
+=cut
 
 }
 
@@ -385,8 +473,13 @@ sub progress {
     my $msg  = shift;
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info($msg);
-    my $p = $self->progressbar;
-    $p->message($msg);
+    if ( $self->has_progressbar ) {
+        my $p = $self->progressbar;
+        $p->message($msg);
+    }
+    else {
+        say $msg;
+    }
 }
 
 1;
