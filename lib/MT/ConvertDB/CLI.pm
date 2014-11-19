@@ -452,6 +452,10 @@ sub do_resave_source {
 
     foreach my $classobj (@$class_objs) {
 
+        # Reset object drivers for class and metaclass
+        undef $classobj->class->properties->{driver};
+        try { undef $classobj->class->meta_pkg->properties->{driver} };
+
         my $iter = $cfgmgr->olddb->load_iter($classobj);
         while ( my $obj = $iter->() ) {
 
