@@ -279,9 +279,10 @@ sub load_meta {
     ### TODO Summaries???
 
     my $meta = { %{ $obj->meta } } || {};
-    defined( $meta->{$_} ) && $obj->meta( $_, $meta->{$_} )
-        foreach keys %$meta;
-    return $meta;
+    foreach my $fld ( keys %$meta ) {
+        $obj->meta( $fld, ( $meta->{$fld} // undef ) );
+    }
+    return $obj->meta;
 }
 
 sub save {
