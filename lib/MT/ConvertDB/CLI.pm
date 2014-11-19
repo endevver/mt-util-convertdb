@@ -74,6 +74,13 @@ option remove_orphans => (
     default => 0,
 );
 
+option check_meta_types => (
+    is      => 'ro',
+    doc     => '',
+    longdoc => '',
+    default => 0,
+);
+
 option resave_source => (
     is      => 'ro',
     doc     => '',
@@ -201,6 +208,9 @@ sub run {
         elsif ( $self->find_orphans || $self->remove_orphans ) {
             $self->do_find_orphans();
         }
+        elsif ( $self->check_meta_types ) {
+            $self->do_check_meta_types();
+        }
         elsif ( $self->test ) {
             $self->do_test();
         }
@@ -264,8 +274,6 @@ sub do_find_orphans {
     ###l4p $l4p ||= get_logger();
     require MT::Meta;
 
-    $l4p->info('Doing test');
-
     $cfgmgr->use_old_database;
 
     my ( %counts, %orphaned );
@@ -320,6 +328,49 @@ sub do_find_orphans {
     }
     p(%counts);
     p(%orphaned);
+}
+
+sub do_check_meta_types {
+    my $self       = shift;
+    my $cfgmgr     = $self->cfgmgr;
+    my $classmgr   = $self->classmgr;
+    my $class_objs = $self->class_objects;
+    ###l4p $l4p ||= get_logger();
+
+    $cfgmgr->use_old_database;
+
+    foreach my $classobj (@$class_objs) {
+        my $class = $classobj->class;
+        my @isa   = try { no strict 'refs'; @{$class.'::ISA'} };
+        next unless grep { $_ eq 'MT::Object' } @isa;
+
+        # Reset object drivers for class and metaclass
+        undef $class->properties->{driver};
+        try { undef $class->meta_pkg->properties->{driver} };
+
+        next unless MT::Meta->has_own_metadata_of($class);
+        $self->progress("Checking for orphaned $class metadata types...");
+
+        try {
+            my $mcols = $classobj->metacolumns;
+            my $mpkg  = $class->meta_pkg;
+            my $pk    = $mpkg->datasource.'_'.$class->datasource.'_id';
+            my $type  = $mpkg->datasource.'_type';
+            my $sql   = "select $type, count(*) from mt_"
+                      . $mpkg->datasource." group by $type";
+            my $rows  = $class->driver->rw_handle->selectall_arrayref($sql);
+
+            foreach my $row ( @$rows ) {
+                my ( $mtype, $cnt ) = @$row;
+                unless ( grep { $_->{name} eq $mtype } @$mcols ) {
+                    $l4p->error("Found $cnt $class metadata records of unknown type '$mtype'")
+                }
+            }
+        }
+        catch {
+            $l4p->error($_);
+        };
+    }
 }
 
 sub do_test {
