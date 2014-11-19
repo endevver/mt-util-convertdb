@@ -339,6 +339,8 @@ sub do_check_meta_types {
 
     $cfgmgr->use_old_database;
 
+    my ( %counts, %orphaned );
+
     foreach my $classobj (@$class_objs) {
         my $class = $classobj->class;
         my @isa   = try { no strict 'refs'; @{$class.'::ISA'} };
@@ -352,6 +354,8 @@ sub do_check_meta_types {
         $self->progress("Checking for orphaned $class metadata types...");
 
         try {
+            $orphaned{$class}     = [];
+            $counts{$class}{meta_total} = $counts{$class}{meta} = $counts{$class}{meta_bad} = 0;
             my $mcols = $classobj->metacolumns;
             my $mpkg  = $class->meta_pkg;
             my $pk    = $mpkg->datasource.'_'.$class->datasource.'_id';
@@ -362,15 +366,23 @@ sub do_check_meta_types {
 
             foreach my $row ( @$rows ) {
                 my ( $mtype, $cnt ) = @$row;
-                unless ( grep { $_->{name} eq $mtype } @$mcols ) {
-                    $l4p->error("Found $cnt $class metadata records of unknown type '$mtype'")
+                if ( grep { $_->{name} eq $mtype } @$mcols ) {
+                    $counts{$class}{meta} += $cnt;
+                }
+                else {
+                    $l4p->error("Found $cnt $class metadata records of unknown type '$mtype'");
+                    $counts{$class}{meta_bad} += $cnt;
+                    push(@{ $orphaned{$class} }, $mtype );
                 }
             }
+            $counts{$class}{meta_total} = $counts{$class}{meta} + $counts{$class}{meta_bad};
         }
         catch {
             $l4p->error($_);
         };
     }
+    p(%counts);
+    p(%orphaned);
 }
 
 sub do_test {
