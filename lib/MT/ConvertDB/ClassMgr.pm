@@ -482,33 +482,33 @@ after save => sub { $_[1]->add_meta };
 
 #############################################################################
 
-package MT::ConvertDB::ClassMgr::Template;
-
-use MT::ConvertDB::ToolSet;
-extends 'MT::ConvertDB::ClassMgr::Generic';
-
-use vars qw( $l4p );
-
-before save => sub {
-    my ( $self, $obj, $metadata ) = @_;
-    ###l4p $l4p ||= get_logger(); $l4p->trace(1);
-
-    my $object_keys = $self->object_keys;
-
-    ## Look for duplicate template names, because
-    ## we have uniqueness constraints in the DB.
-    my $key = $obj->blog_id . ':' . lc( $obj->name );
-    if ( $object_keys->{$key}++ ) {
-        print "        Found duplicate template name '" . $obj->name;
-        $obj->name( $obj->name . ' ' . $object_keys->{$key} );
-        print "'; renaming to '" . $obj->name . "'\n";
-    }
-    ## Touch the text column to make sure we read in
-    ## any linked templates.
-    my $text = $obj->text;
-};
-
-#############################################################################
+# package MT::ConvertDB::ClassMgr::Template;
+#
+# use MT::ConvertDB::ToolSet;
+# extends 'MT::ConvertDB::ClassMgr::Generic';
+#
+# use vars qw( $l4p );
+#
+# before save => sub {
+#     my ( $self, $obj, $metadata ) = @_;
+#     ###l4p $l4p ||= get_logger(); $l4p->trace(1);
+#
+#     my $object_keys = $self->object_keys;
+#
+#     ## Look for duplicate template names, because
+#     ## we have uniqueness constraints in the DB.
+#     my $key = $obj->blog_id . ':' . lc( $obj->name );
+#     if ( $object_keys->{$key}++ ) {
+#         print "        Found duplicate template name '" . $obj->name;
+#         $obj->name( $obj->name . ' ' . $object_keys->{$key} );
+#         print "'; renaming to '" . $obj->name . "'\n";
+#     }
+#     ## Touch the text column to make sure we read in
+#     ## any linked templates.
+#     my $text = $obj->text;
+# };
+#
+# #############################################################################
 
 package MT::ConvertDB::ClassMgr::Author;
 
