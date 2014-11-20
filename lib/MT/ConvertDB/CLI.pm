@@ -451,11 +451,13 @@ sub do_resave_source {
     $cfgmgr->old_config->read_only(0);
 
     foreach my $classobj (@$class_objs) {
+        my $class = $classobj->class;
 
         # Reset object drivers for class and metaclass
-        undef $classobj->class->properties->{driver};
-        try { undef $classobj->class->meta_pkg->properties->{driver} };
+        undef $class->properties->{driver};
+        try { undef $class->meta_pkg->properties->{driver} };
 
+        ###l4p $self->progress(sprintf('Resaving %s objects', $class ));
         my $iter = $cfgmgr->olddb->load_iter($classobj);
         while ( my $obj = $iter->() ) {
 
