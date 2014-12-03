@@ -3,13 +3,40 @@ package MT::ConvertDB::CLI;
 use MT::ConvertDB::ToolSet;
 use Term::ProgressBar 2.00;
 use List::Util qw( reduce );
+use List::MoreUtils qw( none part );
 use MooX::Options;
+use Sub::Quote qw( quote_sub );
 use vars qw( $l4p );
+
+has mode_handlers => (
+    is      => 'ro',
+    default => sub {
+        {
+            show_counts   => 'do_table_counts',
+            # find_orphans  => 'do_find_orphans',
+            check_meta    => 'do_check_meta',
+            resave_source => 'do_resave_source',
+            migrate       => 'do_migrate_verify',
+            verify        => 'do_migrate_verify',
+            test          => 'do_test',
+        }
+    }
+);
+
+option mode => (
+    is      => 'ro',
+    format  => 's',
+    doc     => 'REQUIRED run mode: show-counts, resave-source, find-orphans, check-meta-types, migrate, verify, test',
+    longdoc => '',
+    coerce  => quote_sub(q( $_[0] =~ tr/-/_/; $_[0] )),
+    default => 'init_only',
+    required => 1,
+);
 
 option old_config => (
     is      => 'ro',
     format  => 's',
-    doc     => '',
+    doc     => 'Path to config file for current database. Can be relative to MT_HOME',
     longdoc => '',
     default => './mt-config.cgi',
 );
@@ -18,7 +45,7 @@ option new_config => (
     is       => 'ro',
     format   => 's',
     required => 1,
-    doc      => '',
+    doc      => 'REQUIRED: Path to config file for new database. Can be relative to MT_HOME',
     longdoc  => '',
 );
 
@@ -27,14 +54,8 @@ option classes => (
     format    => 's@',
     autosplit => ',',
     default   => sub { [] },
-    doc       => '',
+    doc       => 'Classes to include. Can be comma-delimited or specified multiple times',
     longdoc   => '',
-);
-
-option show_counts => (
-    is      => 'ro',
-    doc     => '',
-    longdoc => '',
 );
 
 option skip_classes => (
@@ -42,62 +63,34 @@ option skip_classes => (
     format    => 's@',
     autosplit => ',',
     default   => sub { [] },
-    doc       => '',
+    doc       => 'Classes to skip (e.g. MT::Log). Can be comma-delimited or specified multiple times',
     longdoc   => '',
 );
 
 option dry_run => (
     is      => 'rw',
-    doc     => '',
+    doc     => 'DEBUG: Marks new database as read-only for testing during migrate mode',
     longdoc => '',
     default => 0,
 );
 
-option test => (
+option no_verify => (
     is      => 'ro',
-    doc     => '',
-    longdoc => '',
-    default => 0,
-);
-
-option find_orphans => (
-    is      => 'ro',
-    doc     => '',
+    doc     => 'Skip verification of data. Only valid with migrate mode',
     longdoc => '',
     default => 0,
 );
 
 option remove_orphans => (
     is      => 'ro',
-    doc     => '',
+    doc     => 'Remove found orphans. Only valid under check_meta mode',
     longdoc => '',
     default => 0,
 );
 
-option check_meta_types => (
+option remove_obsolete => (
     is      => 'ro',
-    doc     => '',
-    longdoc => '',
-    default => 0,
-);
-
-option resave_source => (
-    is      => 'ro',
-    doc     => '',
-    longdoc => '',
-    default => 0,
-);
-
-option migrate => (
-    is      => 'ro',
-    doc     => '',
-    longdoc => '',
-    default => 0,
-);
-
-option verify => (
-    is      => 'ro',
-    doc     => '',
+    doc     => 'Remove obsolete metadata as defined by the RetiredFields plugin. Only valid under check_meta mode',
     longdoc => '',
     default => 0,
 );
@@ -197,34 +190,24 @@ sub run {
     my $class_objs = $self->class_objects;
     ###l4p $l4p ||= get_logger();
 
-    $self->dry_run(1) unless $self->migrate;
+    $self->dry_run(1) unless $self->mode eq 'migrate';
 
     try {
         local $SIG{__WARN__} = sub { $l4p->warn( $_[0] ) };
 
-        if ( $self->show_counts ) {
-            $self->do_table_counts();
-        }
-        elsif ( $self->find_orphans || $self->remove_orphans ) {
-            $self->do_find_orphans();
-        }
-        elsif ( $self->check_meta_types ) {
-            $self->do_check_meta_types();
-        }
-        elsif ( $self->test ) {
-            $self->do_test();
-        }
-        elsif ( $self->resave_source ) {
-            $self->do_resave_source();
-        }
-        elsif ( $self->migrate || $self->verify ) {
-            $self->do_migrate_verify();
+        if ( $self->mode eq 'init_only' ) {
+            $self->progress( 'Class initialization done for '
+                    . $self->total_objects
+                    . ' objects. '
+                    . 'Exiting without --mode' );
+            p($self);
         }
         else {
-            $self->progress( 'Class initialization done for '
-                    . Sself->total_objects
-                    . ' objects. '
-                    . 'Exiting without --migrate or --verify' );
+            my $handle   = $self->mode_handlers;
+            my $methname = $handle->{$self->mode}
+                or die "Unknown mode: ".$self->mode;
+            my $meth = $self->can($methname);
+            $self->$meth();
         }
         $self->progress('Script complete. All went well.');
     }
@@ -245,8 +228,8 @@ sub do_table_counts {
         "Status",
         "Total Old",
         "Total New",
-        "Objects Old",
-        "Objects New",
+        "Obj Old",
+        "Obj New",
         "Meta Old",
         "Meta New"
     );
@@ -266,7 +249,7 @@ sub do_table_counts {
     return $cnt;
 }
 
-sub do_find_orphans {
+sub do_check_meta {
     my $self       = shift;
     my $cfgmgr     = $self->cfgmgr;
     my $classmgr   = $self->classmgr;
@@ -276,7 +259,9 @@ sub do_find_orphans {
 
     $cfgmgr->use_old_database;
 
-    my ( %counts, %orphaned );
+    my ( %counts, %badmeta );
+    my $rf_obsolete =
+        MT->component('RetiredFields')->registry('obsolete_meta_fields');
 
     foreach my $classobj (@$class_objs) {
         my $class = $classobj->class;
@@ -288,101 +273,103 @@ sub do_find_orphans {
         try { undef $class->meta_pkg->properties->{driver} };
 
         next unless MT::Meta->has_own_metadata_of($class);
-        $self->progress("Checking for orphaned $class metadata...");
+
+        my $ds     = $class->datasource;
+        my $pk     = $class->properties->{primary_key};
+        my $mpkg   = $class->meta_pkg;
+        my $mds    = $mpkg->datasource;
+        my $mtable = "mt_${mds}";
+        my $mtype  = "${mds}_type";
+        my $mpk    = join('_', $mds, $ds, $pk); # e.g. blog_meta_blog_id
+        my $dbh    = $mpkg->driver->rw_handle;
+        $badmeta{$class}{$_} = [] foreach qw( type parent );
+        $counts{$class}{$_}   = 0 foreach qw( total bad_type bad_parent );
+
+        $self->progress("Checking $class metadata...");
 
         try {
-            $orphaned{$class}     = [];
-            $counts{$class}{meta_total} = $counts{$class}{meta} = $counts{$class}{meta_bad} = 0;
-            my $mpkg = $class->meta_pkg;
-            my $pk     = $mpkg->datasource.'_'.$class->datasource.'_id';
-            my $sql    = "select $pk, count(*) from mt_"
-                       . $mpkg->datasource." group by $pk";
-            my $rows   = $class->driver->rw_handle->selectall_arrayref($sql);
-            # p($rows);
+            my $sql   = "SELECT $mtype, count(*) FROM $mtable GROUP BY $mtype";
+            my $rows  = $dbh->selectall_arrayref($sql);
+            my $mcols = $classobj->metacolumns;
+            foreach my $row ( @$rows ) {
+                my ( $type, $cnt )     = @$row;
+                $counts{$class}{total} += $cnt;
 
+                unless ( grep { $_->{name} eq $type } @$mcols ) {
+                    ###l4p $l4p->error( "Found $cnt $class meta records "
+                    ###l4p            . "of unknown type '$type'" );
+                    $counts{$class}{bad_type} += $cnt;
+                    push(@{ $badmeta{$class}{type} }, $type );
+                }
+            }
+        }
+        catch { $l4p->error($_); exit };
+
+        try {
+            my $sql  = "SELECT $mpk, count(*) FROM $mtable GROUP BY $mpk";
+            my $rows = $dbh->selectall_arrayref($sql);
             foreach my $row ( @$rows ) {
                 my ( $obj_id, $cnt ) = @$row;
-                if ( $class->exist({ $class->properties->{primary_key} => $obj_id }) ) {
-                    $counts{$class}{meta} += $cnt;
-                }
-                else {
-                    $l4p->error("Found $cnt orphaned metadata records for $class ID $obj_id");
-                    $counts{$class}{meta_bad} += $cnt;
-                    push(@{ $orphaned{$class} }, $obj_id );
+                unless ( $class->exist({ $pk => $obj_id }) ) {
+                    ###l4p $l4p->error( "Found $cnt $class meta records "
+                    ###l4p    . "with non-existent parent ID $obj_id" );
+                    $counts{$class}{bad_parent} += $cnt;
+                    push(@{ $badmeta{$class}{parent} }, $obj_id );
                 }
             }
-            $counts{$class}{meta_total} = $counts{$class}{meta} + $counts{$class}{meta_bad};
+        }
+        catch { $l4p->error($_); exit };
 
-            if ( $self->remove_orphans && @{ $orphaned{$class} }) {
-                # p($mpkg->driver);
-                my $dbh = $mpkg->driver->rw_handle;
+        if ( $self->remove_orphans && @{ $badmeta{$class}{parent} }) {
+            $self->progress("Removing orphaned metadata for $class...");
+            try {
                 local $dbh->{RaiseError} = 1;
-                my $meta_id = $class->datasource . '_id';
-                $self->progress("Removing orphaned metadata for $class: ");
-                $mpkg->driver->direct_remove( $mpkg, { $meta_id => $orphaned{$class} } );
+                my $id  = $class->datasource . '_id';
+                my $ids = $badmeta{$class}{parent}; p( $ids );
+                $mpkg->driver->direct_remove( $mpkg, { $id => $ids } )
+                    if @$ids;
             }
+            catch { $l4p->error($_); exit };
         }
-        catch {
-            $l4p->error($_);
-        };
-    }
-    p(%counts);
-    p(%orphaned);
-}
 
-sub do_check_meta_types {
-    my $self       = shift;
-    my $cfgmgr     = $self->cfgmgr;
-    my $classmgr   = $self->classmgr;
-    my $class_objs = $self->class_objects;
-    ###l4p $l4p ||= get_logger();
+        if ( $self->remove_obsolete
+          && @{ $badmeta{$class}{type} }
+          && try { exists $rf_obsolete->{$ds} } ) {
+            try {
+                my $is_unknown = sub {
+                    my $v = shift;
+                    none { $v eq $_ } @{ $rf_obsolete->{$ds} } ? 1 : 0;
+                };
 
-    $cfgmgr->use_old_database;
+                my ( $obsoletes, $unhandled )
+                    = part { $is_unknown->($_) } @{ $badmeta{$class}{type} };
 
-    my ( %counts, %orphaned );
-
-    foreach my $classobj (@$class_objs) {
-        my $class = $classobj->class;
-        my @isa   = try { no strict 'refs'; @{$class.'::ISA'} };
-        next unless grep { $_ eq 'MT::Object' } @isa;
-
-        # Reset object drivers for class and metaclass
-        undef $class->properties->{driver};
-        try { undef $class->meta_pkg->properties->{driver} };
-
-        next unless MT::Meta->has_own_metadata_of($class);
-        $self->progress("Checking for orphaned $class metadata types...");
-
-        try {
-            $orphaned{$class}     = [];
-            $counts{$class}{meta_total} = $counts{$class}{meta} = $counts{$class}{meta_bad} = 0;
-            my $mcols = $classobj->metacolumns;
-            my $mpkg  = $class->meta_pkg;
-            my $pk    = $mpkg->datasource.'_'.$class->datasource.'_id';
-            my $type  = $mpkg->datasource.'_type';
-            my $sql   = "select $type, count(*) from mt_"
-                      . $mpkg->datasource." group by $type";
-            my $rows  = $class->driver->rw_handle->selectall_arrayref($sql);
-
-            foreach my $row ( @$rows ) {
-                my ( $mtype, $cnt ) = @$row;
-                if ( grep { $_->{name} eq $mtype } @$mcols ) {
-                    $counts{$class}{meta} += $cnt;
+                if ( $obsoletes && @$obsoletes ) {
+                    $self->progress("Removing obsolete metadata fields for $class...");
+                    p( $obsoletes );
+                    local $dbh->{RaiseError} = 1;
+                    $mpkg->driver->direct_remove( $mpkg, { type => $obsoletes });
                 }
-                else {
-                    $l4p->error("Found $cnt $class metadata records of unknown type '$mtype'");
-                    $counts{$class}{meta_bad} += $cnt;
-                    push(@{ $orphaned{$class} }, $mtype );
+
+                if ( $unhandled && @$unhandled ) {
+                    $self->progress('Not removing the following fields which '
+                          . 'were not specified by the RetiredFields plugin: '
+                          . (join(', ', @$unhandled)));
                 }
             }
-            $counts{$class}{meta_total} = $counts{$class}{meta} + $counts{$class}{meta_bad};
+            catch { $l4p->error($_); exit };
         }
-        catch {
-            $l4p->error($_);
-        };
     }
     p(%counts);
-    p(%orphaned);
+
+    say "Orphaned metadata fields:";
+    delete $badmeta{$_}{type}
+        for grep { ! @{$badmeta{$_}{type}} } keys %badmeta;
+    delete $badmeta{$_}{parent}
+        for grep { ! @{$badmeta{$_}{parent}} } keys %badmeta;
+    delete $badmeta{$_}
+        for grep { ! %{ $badmeta{$_} } } keys %badmeta;
+    p(%badmeta);
 }
 
 sub do_test {
@@ -488,7 +475,7 @@ sub do_migrate_verify {
     my $class_objs = $self->class_objects;
     ###l4p $l4p ||= get_logger();
 
-    if ( $self->migrate ) {
+    if ( $self->mode eq 'migrate' ) {
         ###l4p $l4p->info( "Removing all rows from tables in new database" );
         $cfgmgr->newdb->remove_all($_) foreach @$class_objs;
         $self->do_table_counts();
@@ -501,7 +488,7 @@ sub do_migrate_verify {
         my $class = $classobj->class;
 
         ###l4p $self->progress(sprintf('%s %s objects',
-        ###l4p     ($self->migrate ? 'Migrating' : 'Verifying'), $class ));
+        ###l4p     ($self->mode eq 'migrate' ? 'Migrating' : 'Verifying'), $class ));
         my $iter = $cfgmgr->olddb->load_iter($classobj);
         while ( my $obj = $iter->() ) {
 
@@ -513,10 +500,10 @@ sub do_migrate_verify {
             my $meta = $cfgmgr->olddb->load_meta( $classobj, $obj );
 
             $cfgmgr->newdb->save( $classobj, $obj, $meta )
-                if $self->migrate;
+                if $self->mode eq 'migrate';
 
             $self->verify_migration( $classobj, $obj, $meta )
-                if $self->verify;
+                if $self->mode eq 'verify' or ! $self->no_verify;
 
             $count += 1 + scalar( keys %$meta );
             $next_update = $self->progressbar->update($count)
@@ -530,7 +517,8 @@ sub do_migrate_verify {
     $cfgmgr->post_migrate($classmgr) unless $self->dry_run;
     $self->progress("Processing of ALL OBJECTS complete.");
 
-    $self->verify_record_counts() if $self->verify;
+    $self->verify_record_counts()
+        if $self->mode eq 'verify' or ! $self->no_verify;
 
     $self->progressbar->update( $self->total_objects );
 }

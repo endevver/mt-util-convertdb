@@ -1,6 +1,8 @@
 package MT::ConvertDB::ToolSet;
 
-use base 'ToolSet';
+use strict;
+use warnings;
+use parent 'ToolSet';
 
 BEGIN { die "MT_HOME environment not set " unless $ENV{MT_HOME} }
 
@@ -28,8 +30,4 @@ ToolSet->export(
     'Module::Runtime'      => [qw( use_module use_package_optimistically )],
 );
 
-# define exports from this module
-# our @EXPORT = qw( shout );
-# sub shout { print uc shift };
-
-1;    # modules must return true
+1;
