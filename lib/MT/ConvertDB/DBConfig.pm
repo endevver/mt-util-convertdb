@@ -229,10 +229,23 @@ sub check_plugins {
 sub check_schema {
     my $self = shift;
     ###l4p $l4p ||= get_logger(); $l4p->info('Loading/checking database schema');
+
+    # if ( $self->read_only ) {
+    #     require MT::Object;
+    #     require MT::Config;
+    #     my $driver = $self->driver;
+    #     unless ( $driver->table_exists('MT::Config') ) {
+    #         $l4p->warn('mt_config table does not exist. Unsetting read only for driver for '.$self->file.' '.p($driver));
+    #         p($self);
+    #         $self->read_only(0);
+    #     }
+    # }
+
     require MT::Upgrade;
     MT::Upgrade->do_upgrade(
-        CLI => 1,
-        $self->read_only ? () : ( Install => 1 )
+        CLI     => 1,
+        Install => 1,
+        # $self->read_only ? () : ( Install => 1 )
     ) or die MT::Upgrade->errstr;
 }
 
