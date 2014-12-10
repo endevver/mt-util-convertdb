@@ -5,6 +5,11 @@ use List::MoreUtils qw( uniq );
 use Class::Load qw( try_load_class load_first_existing_class );
 use vars qw( $l4p );
 
+has exclude_tables => (
+    is      => 'ro',
+    default => sub { [] },
+);
+
 has exclude_classes => (
     is      => 'ro',
     default => sub { [] },
@@ -40,13 +45,14 @@ my %class_objects_generated;
 
 sub class_objects {
     my $self = shift;
-    my ( $include, $exclude ) = @_;
+    my ( $include, $exclude, $excludeds ) = @_;
     ###l4p $l4p ||= get_logger(); $l4p->trace();
 
     %class_objects_generated = ();
 
-    $include ||= $self->include_classes;
-    $exclude ||= $self->exclude_classes;
+    $include   ||= $self->include_classes;
+    $exclude   ||= $self->exclude_classes;
+    $excludeds ||= $self->exclude_tables;
 
     $self->_filter_excludes(
         [ map { $self->_mk_class_objects($_) } @$include ] );
@@ -55,7 +61,10 @@ sub class_objects {
 sub _filter_excludes {
     my $self  = shift;
     my $array = shift;
-    [ grep { !( $_->class ~~ $self->exclude_classes ) } @$array ];
+    [
+        grep { !( $_->class->datasource ~~ $self->exclude_tables ) }
+        grep { !( $_->class ~~ $self->exclude_classes ) } @$array
+    ];
 }
 
 sub _mk_class_objects {

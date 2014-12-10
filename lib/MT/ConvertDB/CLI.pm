@@ -67,6 +67,15 @@ option skip_classes => (
     longdoc   => '',
 );
 
+option skip_tables => (
+    is        => 'ro',
+    format    => 's@',
+    autosplit => ',',
+    default   => sub { [] },
+    doc       => 'Tables to skip (without the "mt_" prefix, e.g. log ). Can be comma-delimited or specified multiple times',
+    longdoc   => '',
+);
+
 option dry_run => (
     is      => 'rw',
     doc     => 'DEBUG: Marks new database as read-only for testing during migrate mode',
@@ -123,6 +132,7 @@ sub _build_classmgr {
     my %param = ();
     $param{include_classes} = $self->classes      if @{ $self->classes };
     $param{exclude_classes} = $self->skip_classes if @{ $self->skip_classes };
+    $param{exclude_tables}  = $self->skip_tables  if @{ $self->skip_tables };
     use_module('MT::ConvertDB::ClassMgr')->new(%param);
 }
 
@@ -139,8 +149,11 @@ sub _build_cfgmgr {
 
 sub _build_class_objects {
     my $self = shift;
-    [ grep { !( $_->class ~~ $self->skip_classes ) }
-            @{ $self->classmgr->class_objects() } ];
+    [
+        grep { !( $_->class->datasource ~~ $self->skip_tables ) }
+        grep { !( $_->class ~~ $self->skip_classes ) }
+                @{ $self->classmgr->class_objects() }
+    ];
 }
 
 sub _build_progressbar {
