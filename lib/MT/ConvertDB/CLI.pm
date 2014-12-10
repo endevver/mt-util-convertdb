@@ -270,8 +270,6 @@ sub do_check_meta {
     ###l4p $l4p ||= get_logger();
     require MT::Meta;
 
-    $cfgmgr->use_old_database;
-
     my ( %counts, %badmeta );
     my $rf_obsolete =
         MT->component('RetiredFields')->registry('obsolete_meta_fields');
@@ -282,8 +280,8 @@ sub do_check_meta {
         next unless grep { $_ eq 'MT::Object' } @isa;
 
         # Reset object drivers for class and metaclass
-        undef $class->properties->{driver};
-        try { undef $class->meta_pkg->properties->{driver} };
+        $cfgmgr->use_old_database;
+        $classobj->reset_object_drivers();
 
         next unless MT::Meta->has_own_metadata_of($class);
 
