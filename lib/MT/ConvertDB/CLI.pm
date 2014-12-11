@@ -175,6 +175,14 @@ option dry_run => (
     order    => 12,
 );
 
+option readme => (
+    is       => 'ro',
+    format   => 's',
+    doc      => 'hidden',
+    default  => 0,
+    order    => 13,
+);
+
 has classmgr => ( is => 'lazy', );
 
 has cfgmgr => ( is => 'lazy', );
@@ -722,6 +730,72 @@ sub progress {
         say $msg;
     }
 }
+
+our $README = '';
+
+around parse_options => sub {
+    my ( $orig, $class, %params) = (shift, shift, @_);
+    # warn "In parse_options";
+    if ( grep { '--readme' eq $_ } @ARGV ) {
+        push( @ARGV, '--man' );
+        my %p = $class->$orig(%params);
+        $README = $p{readme};
+        return %p;
+    }
+    my %p = $class->$orig(%params);
+};
+
+around options_man => sub {
+    my ( $orig, $class, $usage, $output ) = @_;
+    # p(@_);
+    local @ARGV = ();
+    if ( !$usage ) {
+        local @ARGV = ();
+        my %cmdline_params = $class->parse_options( man => 1 );
+        $usage = $cmdline_params{man};
+    }
+
+    $Pod::POM::DEFAULT_VIEW = 'Pod::POM::View::Pod';
+    my ($printing, @extra_pod) = ( 0, () );
+    for my $node ( $pom->content ) {
+        unless ( $printing ) {
+            next unless $node->type() eq 'head1'
+                    and $node->title eq 'MODES';
+            $printing = 1;
+        }
+        push( @extra_pod, $node->present('Pod::POM::View::Pod') );
+    }
+
+    use Path::Class;
+    my $man_file = file( Path::Class::tempdir( CLEANUP => 1 ), 'help.pod' );
+    $man_file->spew(
+        iomode => '>:encoding(UTF-8)',
+        join("\n\n", $usage->option_pod, @extra_pod)
+    );
+
+    if ( $README eq 'txt' ) {
+        require Pod::Text;
+        Pod::Text->filter( $man_file->stringify )
+    }
+    elsif ( $README eq 'md' ) {
+        require Pod::Markdown;
+        Pod::Markdown->filter( $man_file->stringify )
+    }
+    elsif ( $README eq 'gh' ) {
+        require Pod::Markdown::Github;
+        Pod::Markdown::Github->filter( $man_file->stringify );
+    }
+    else {
+        pod2usage(
+            -verbose => 2,
+            -input   => $man_file->stringify,
+            -exitval => 'NOEXIT',
+            -output  => $output
+        );
+    }
+
+    exit(0);
+};
 
 1;
 
