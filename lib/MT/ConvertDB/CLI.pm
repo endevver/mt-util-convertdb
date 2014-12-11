@@ -252,14 +252,14 @@ sub do_table_counts {
 
     use Text::Table;
     my $tb = Text::Table->new(
-        "Data source",
+        "Table",
         "Status",
-        "Total Old",
-        "Total New",
-        "Obj Old",
-        "Obj New",
-        "Meta Old",
-        "Meta New"
+        "Old",
+        "New",
+        "Obj-Old",
+        "Obj-New",
+        "Meta-Old",
+        "Meta-New"
     );
     foreach my $ds ( sort keys $cnt ) {
         my $old = $cnt->{$ds}{old};
