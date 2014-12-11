@@ -601,7 +601,7 @@ sub _do_migrate_unknown {
     ###l4p $l4p ||= get_logger();
 
     my @unknown = map { @{ $_->{$ds} || [] } } $unused, $obsolete;
-    p(@unknown);
+    ###l4p $l4p->debug('Migrating unregistered meta fields: ', l4mtdump(@unknown));
 
     require SQL::Abstract;
     my $sql = SQL::Abstract->new();
@@ -610,8 +610,8 @@ sub _do_migrate_unknown {
     $self->cfgmgr->use_new_database;
     $arg->{classobj}->reset_object_drivers();
     my $newdb = $arg->{mpkg}->driver;
-    $self->cfgmgr->use_old_database;
 
+    $self->cfgmgr->use_old_database;
     foreach my $unknown ( @unknown ) {
         next if grep { $unknown eq $_->{name} } @$mcols;
         my( $select, @sbind ) = $sql->select(
@@ -619,7 +619,7 @@ sub _do_migrate_unknown {
             ['*'],
             { $arg->{mds}.'_type' => $unknown }
         );
-        say $select.' '.p(@sbind);
+        ###l4p $l4p->debug( $select.' '.p(@sbind) );
 
         my ($insert, $isth);
         my $ssth = $olddb->rw_handle->prepare($select);
@@ -627,8 +627,9 @@ sub _do_migrate_unknown {
         while ( my $d = $ssth->fetchrow_hashref ) {
             $insert ||= $sql->insert($mtable, $d);
             $isth   ||= $newdb->rw_handle->prepare($insert);
-            say $insert.' '.p($sql->values($d));
-            $isth->execute($sql->values($d));
+            ###l4p $l4p->info( $insert.' '.p($sql->values($d)));
+            try { $isth->execute($sql->values($d)); }
+            catch { $l4p->warn('Insert error: '.$_) };
         }
     }
 
