@@ -105,17 +105,22 @@ option remove_orphans => (
     default => 0,
 );
 
-option remove_obsolete => (
-    is      => 'ro',
-    doc     => 'Remove obsolete metadata as defined by the RetiredFields plugin. Only valid under check_meta mode',
-    longdoc => '',
-    default => 0,
-);
+# option remove_obsolete => (
+#     is      => 'ro',
+#     doc     => '[WITH MODE: checkmeta] Remove obsolete metadata as defined by the RetiredFields plugin. You probably should not use this.',
+#     long_doc => q(),
+#     default => 0,
+#     order   => 10,
+# );
+#
+# option remove_unused => (
+#     is      => 'ro',
+#     doc     => '[WITH MODE: checkmeta] Remove all unused (i.e. unregistered) metadata. You probably should not use this.',
+#     long_doc => q(),
+#     default => 0,
+#     order   => 11,
+# );
 
-option remove_unused => (
-    is      => 'ro',
-    doc     => 'Remove all unused (i.e. unregistered) metadata. Only valid under check_meta mode',
-    longdoc => '',
     default => 0,
 );
 
