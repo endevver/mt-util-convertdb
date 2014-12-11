@@ -200,6 +200,51 @@ has metacolumns => (
     clearer   => 1,
 );
 
+has ds => (
+    is => 'lazy',
+    isa => quote_sub(q( defined($_[0]) or die "datasource not defined" )),
+);
+
+has table => (
+    is => 'lazy',
+    isa => quote_sub(q( defined($_[0]) or die "table not defined" )),
+);
+
+has mpkg => (
+    is => 'lazy',
+);
+
+has mds => (
+    is => 'lazy',
+);
+
+has mtable => (
+    is => 'lazy',
+);
+
+sub _build_ds { shift->class->datasource }
+sub _build_table  { 'mt_'.(shift->ds)    }
+
+sub _build_mpkg {
+    my $self  = shift;
+    my $class = $self->class;
+    my @isa   = try { no strict 'refs'; @{$class.'::ISA'} };
+    return unless grep { $_ eq 'MT::Object' } @isa;
+
+    require MT::Meta;
+    return MT::Meta->has_own_metadata_of($class) ? $class->meta_pkg : undef;
+}
+
+sub _build_mds {
+    my $self = shift;
+    try { $self->mpkg->datasource }
+}
+
+sub _build_mtable {
+    my $self = shift;
+    return $self->mds ? 'mt_'.($self->mds) : undef;
+}
+
 sub _build_metacolumns {
     my $self = shift;
     require MT::Meta;
