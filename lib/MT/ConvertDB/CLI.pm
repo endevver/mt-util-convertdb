@@ -112,6 +112,13 @@ option remove_obsolete => (
     default => 0,
 );
 
+option remove_unused => (
+    is      => 'ro',
+    doc     => 'Remove all unused (i.e. unregistered) metadata. Only valid under check_meta mode',
+    longdoc => '',
+    default => 0,
+);
+
 has classmgr => ( is => 'lazy', );
 
 has cfgmgr => ( is => 'lazy', );
@@ -193,7 +200,7 @@ sub _build_table_counts {
     for my $which (qw( old new )) {
         my $db = $which eq 'old' ? $cfgmgr->olddb : $cfgmgr->newdb;
         foreach my $classobj (@$class_objs) {
-            my $ds = $classobj->class->datasource;
+            my $ds = $classobj->ds;
             unless ( $cnts->{$ds}{$which} ) {
                 $cnts->{$ds}{$which} = $db->table_counts($classobj);
                 $total += $cnts->{$ds}{$which}{total};
@@ -291,28 +298,30 @@ sub do_check_meta {
 
         next unless MT::Meta->has_own_metadata_of($class);
 
-        my %arg = $self->_create_check_meta_args(
+        my $arg = $self->_create_check_meta_args({
             classobj => $classobj,
             counts   => \%counts,
-            badmeta  => \%badmeta
-        );
+            badmeta  => \%badmeta,
+        });
+        $arg->{dbh}{RaiseError}       = 1;
+        $arg->{dbh}{FetchHashKeyName} = 'NAME_lc'; # lc($colnames)
 
         $self->progress("Checking $class metadata...");
 
         try {
-            $self->_do_check_unknown(\%arg);
-            $self->_do_check_orphans(\%arg);
+            $self->_do_check_unknown($arg);
+            $self->_do_check_orphans($arg);
         }
         catch { $l4p->error($_); exit };
 
-        $self->_do_remove_orphans(\%arg) if $self->remove_orphans;
+        $self->_do_remove_orphans($arg) if $self->remove_orphans;
 
         if ( $self->migrate_unknown ) {
-            $self->_do_migrate_unknown(\%arg);
+            $self->_do_migrate_unknown($arg);
         }
         else {
-            $self->_do_remove_obsolete(\%arg) if $self->remove_obsolete;
-            $self->_do_remove_unused(\%arg)   if $self->remove_unused;
+            $self->_do_remove_obsolete($arg) if $self->remove_obsolete;
+            $self->_do_remove_unused($arg)   if $self->remove_unused;
         }
     }
     p(%counts);
@@ -518,13 +527,15 @@ sub verify_record_counts {
 
 sub _do_check_unknown {
     my ($self, $arg) = @_;
-    my $class = $arg->{class};
+    my $classobj = $arg->{classobj};
+    my $class    = $arg->{class};
     ###l4p $l4p ||= get_logger();
-    my $sql   = " SELECT ". $arg->{mtype}.", count(*) "
-              . " FROM " . $arg->{mtable}
-              . " GROUP BY ".$arg->{mtype};
+    my $mtype = $classobj->mds.'_type';
+    my $sql   = " SELECT $mtype, count(*) "
+              . " FROM " . $classobj->mtable
+              . " GROUP BY $mtype";
     my $rows  = $arg->{dbh}->selectall_arrayref($sql);
-    my $mcols = $arg->{classobj}->metacolumns;
+    my $mcols = $classobj->metacolumns;
     foreach my $row ( @$rows ) {
         my ( $type, $cnt ) = @$row;
         $arg->{counts}{$class}{total} += $cnt;
@@ -540,12 +551,15 @@ sub _do_check_unknown {
 
 sub _do_check_orphans {
     my ($self, $arg) = @_;
-    my ($class, $mpk, $mtable)  = map { $arg->{$_} } qw( class mpk mtable );
+    my ($class, $mtable) = map { $arg->{$_} } qw( class mtable );
+    my $pk   = $class->properties->{primary_key};
+    my $mpk  = join('_', @{$arg}{'mds','ds'}, $pk);
     my $sql  = "SELECT $mpk, count(*) FROM $mtable GROUP BY $mpk";
     my $rows = $arg->{dbh}->selectall_arrayref($sql);
+
     foreach my $row ( @$rows ) {
         my ( $obj_id, $cnt ) = @$row;
-        unless ( $class->exist({ $arg->{pk} => $obj_id }) ) {
+        unless ( $class->exist({ $pk => $obj_id }) ) {
             ###l4p $l4p->error( "Found $cnt $class meta records "
             ###l4p    . "with non-existent parent ID $obj_id" );
             $arg->{counts}{$class}{bad_parent} += $cnt;
@@ -600,8 +614,11 @@ sub _do_migrate_unknown {
 
     foreach my $unknown ( @unknown ) {
         next if grep { $unknown eq $_->{name} } @$mcols;
-        my( $select, @sbind )
-            = $sql->select( $mtable, ['*'], {$arg->{mtype} => $unknown} );
+        my( $select, @sbind ) = $sql->select(
+            $mtable,
+            ['*'],
+            { $arg->{mds}.'_type' => $unknown }
+        );
         say $select.' '.p(@sbind);
 
         my ($insert, $isth);
@@ -667,24 +684,15 @@ sub _do_direct_remove {
 }
 
 sub _create_check_meta_args {
-    my ($self, %arg) = @_;
-    my $class = $arg{class} = $arg{classobj}->class;
-    my $mpkg  = $arg{mpkg} = $class->meta_pkg;
-    my $mds   = $arg{mds} = $mpkg->datasource;
-    %arg   = (
-        %arg,
-        ds     => $class->datasource,
-        pk     => $class->properties->{primary_key},
-        dbh    => $mpkg->driver->rw_handle,
-        mtable => "mt_${mds}",
-        mtype  => "${mds}_type",
-    );
-    $arg{mpk} = join('_', @arg{'mds','ds','pk'});
-    $arg{badmeta}{$class}{$_} = [] foreach qw( type parent );
-    $arg{counts}{$class}{$_}   = 0 foreach qw( total bad_type bad_parent );
-    local $arg{dbh}{RaiseError}       = 1;
-    local $arg{dbh}{FetchHashKeyName} = 'NAME_lc'; # lc($colnames)
-    return %arg;
+    my ( $self, $arg ) = @_;
+    my $classobj       = $arg->{classobj};
+    $arg->{$_}         = $classobj->$_ for qw( class mpkg ds mds table mtable );
+    $arg->{dbh}        = $arg->{mpkg}->driver->rw_handle;
+
+    my $class = $arg->{class};
+    $arg->{badmeta}{$class}{$_} = [] foreach qw( type parent );
+    $arg->{counts}{$class}{$_}  = 0 foreach qw( total bad_type bad_parent );
+    return $arg;
 }
 
 sub progress {
