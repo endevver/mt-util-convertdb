@@ -5,6 +5,7 @@ use Term::ProgressBar 2.00;
 use List::Util qw( reduce );
 use List::MoreUtils qw( none part );
 use MooX::Options;
+use Term::Prompt qw( prompt );
 use Sub::Quote qw( quote_sub );
 use vars qw( $l4p );
 
@@ -86,6 +87,13 @@ option dry_run => (
 option no_verify => (
     is      => 'ro',
     doc     => 'Skip verification of data. Only valid with migrate mode',
+    longdoc => '',
+    default => 0,
+);
+
+option migrate_unknown => (
+    is      => 'ro',
+    doc     => 'Migrate all unknown metadata. Only valid under check_meta mode',
     longdoc => '',
     default => 0,
 );
@@ -271,8 +279,6 @@ sub do_check_meta {
     require MT::Meta;
 
     my ( %counts, %badmeta );
-    my $rf_obsolete =
-        MT->component('RetiredFields')->registry('obsolete_meta_fields');
 
     foreach my $classobj (@$class_objs) {
         my $class = $classobj->class;
@@ -285,90 +291,28 @@ sub do_check_meta {
 
         next unless MT::Meta->has_own_metadata_of($class);
 
-        my $ds     = $class->datasource;
-        my $pk     = $class->properties->{primary_key};
-        my $mpkg   = $class->meta_pkg;
-        my $mds    = $mpkg->datasource;
-        my $mtable = "mt_${mds}";
-        my $mtype  = "${mds}_type";
-        my $mpk    = join('_', $mds, $ds, $pk); # e.g. blog_meta_blog_id
-        my $dbh    = $mpkg->driver->rw_handle;
-        $badmeta{$class}{$_} = [] foreach qw( type parent );
-        $counts{$class}{$_}   = 0 foreach qw( total bad_type bad_parent );
+        my %arg = $self->_create_check_meta_args(
+            classobj => $classobj,
+            counts   => \%counts,
+            badmeta  => \%badmeta
+        );
 
         $self->progress("Checking $class metadata...");
 
         try {
-            my $sql   = "SELECT $mtype, count(*) FROM $mtable GROUP BY $mtype";
-            my $rows  = $dbh->selectall_arrayref($sql);
-            my $mcols = $classobj->metacolumns;
-            foreach my $row ( @$rows ) {
-                my ( $type, $cnt )     = @$row;
-                $counts{$class}{total} += $cnt;
-
-                unless ( grep { $_->{name} eq $type } @$mcols ) {
-                    ###l4p $l4p->error( "Found $cnt $class meta records "
-                    ###l4p            . "of unknown type '$type'" );
-                    $counts{$class}{bad_type} += $cnt;
-                    push(@{ $badmeta{$class}{type} }, $type );
-                }
-            }
+            $self->_do_check_unknown(\%arg);
+            $self->_do_check_orphans(\%arg);
         }
         catch { $l4p->error($_); exit };
 
-        try {
-            my $sql  = "SELECT $mpk, count(*) FROM $mtable GROUP BY $mpk";
-            my $rows = $dbh->selectall_arrayref($sql);
-            foreach my $row ( @$rows ) {
-                my ( $obj_id, $cnt ) = @$row;
-                unless ( $class->exist({ $pk => $obj_id }) ) {
-                    ###l4p $l4p->error( "Found $cnt $class meta records "
-                    ###l4p    . "with non-existent parent ID $obj_id" );
-                    $counts{$class}{bad_parent} += $cnt;
-                    push(@{ $badmeta{$class}{parent} }, $obj_id );
-                }
-            }
+        $self->_do_remove_orphans(\%arg) if $self->remove_orphans;
+
+        if ( $self->migrate_unknown ) {
+            $self->_do_migrate_unknown(\%arg);
         }
-        catch { $l4p->error($_); exit };
-
-        if ( $self->remove_orphans && @{ $badmeta{$class}{parent} }) {
-            $self->progress("Removing orphaned metadata for $class...");
-            try {
-                local $dbh->{RaiseError} = 1;
-                my $id  = $class->datasource . '_id';
-                my $ids = $badmeta{$class}{parent}; p( $ids );
-                $mpkg->driver->direct_remove( $mpkg, { $id => $ids } )
-                    if @$ids;
-            }
-            catch { $l4p->error($_); exit };
-        }
-
-        if ( $self->remove_obsolete
-          && @{ $badmeta{$class}{type} }
-          && try { exists $rf_obsolete->{$ds} } ) {
-            try {
-                my $is_unknown = sub {
-                    my $v = shift;
-                    none { $v eq $_ } @{ $rf_obsolete->{$ds} } ? 1 : 0;
-                };
-
-                my ( $obsoletes, $unhandled )
-                    = part { $is_unknown->($_) } @{ $badmeta{$class}{type} };
-
-                if ( $obsoletes && @$obsoletes ) {
-                    $self->progress("Removing obsolete metadata fields for $class...");
-                    p( $obsoletes );
-                    local $dbh->{RaiseError} = 1;
-                    $mpkg->driver->direct_remove( $mpkg, { type => $obsoletes });
-                }
-
-                if ( $unhandled && @$unhandled ) {
-                    $self->progress('Not removing the following fields which '
-                          . 'were not specified by the RetiredFields plugin: '
-                          . (join(', ', @$unhandled)));
-                }
-            }
-            catch { $l4p->error($_); exit };
+        else {
+            $self->_do_remove_obsolete(\%arg) if $self->remove_obsolete;
+            $self->_do_remove_unused(\%arg)   if $self->remove_unused;
         }
     }
     p(%counts);
@@ -570,6 +514,177 @@ sub verify_record_counts {
                 l4mtdump( $cnts->{$ds} ) );
         }
     }
+}
+
+sub _do_check_unknown {
+    my ($self, $arg) = @_;
+    my $class = $arg->{class};
+    ###l4p $l4p ||= get_logger();
+    my $sql   = " SELECT ". $arg->{mtype}.", count(*) "
+              . " FROM " . $arg->{mtable}
+              . " GROUP BY ".$arg->{mtype};
+    my $rows  = $arg->{dbh}->selectall_arrayref($sql);
+    my $mcols = $arg->{classobj}->metacolumns;
+    foreach my $row ( @$rows ) {
+        my ( $type, $cnt ) = @$row;
+        $arg->{counts}{$class}{total} += $cnt;
+
+        unless ( grep { $_->{name} eq $type } @$mcols ) {
+            ###l4p $l4p->error( "Found $cnt $class meta records "
+            ###l4p            . "of unknown type '$type'" );
+            $arg->{counts}{$class}{bad_type} += $cnt;
+            push(@{ $arg->{badmeta}{$class}{type} }, $type );
+        }
+    }
+}
+
+sub _do_check_orphans {
+    my ($self, $arg) = @_;
+    my ($class, $mpk, $mtable)  = map { $arg->{$_} } qw( class mpk mtable );
+    my $sql  = "SELECT $mpk, count(*) FROM $mtable GROUP BY $mpk";
+    my $rows = $arg->{dbh}->selectall_arrayref($sql);
+    foreach my $row ( @$rows ) {
+        my ( $obj_id, $cnt ) = @$row;
+        unless ( $class->exist({ $arg->{pk} => $obj_id }) ) {
+            ###l4p $l4p->error( "Found $cnt $class meta records "
+            ###l4p    . "with non-existent parent ID $obj_id" );
+            $arg->{counts}{$class}{bad_parent} += $cnt;
+            push(@{ $arg->{badmeta}{$class}{parent} }, $obj_id );
+        }
+    }
+}
+
+sub _do_remove_orphans {
+    my ($self, $arg) = @_;
+    my $class        = $arg->{class};
+    my $mpkg         = $arg->{mpkg};
+    my $parent_ids   = $arg->{badmeta}{$class}{parent} || [];
+    ###l4p $l4p ||= get_logger();
+    return unless @$parent_ids;
+
+    my $msg = 'Are you sure you want to remove '.$arg->{mtable} .' rows with '
+            . 'non-existent parents? (This is destructive and '
+            . 'non-reversible!)';
+    return unless prompt('y', $msg, 'y/n', 'n');
+
+    $self->progress("Removing orphaned metadata for $class... "
+        .p( $parent_ids ));
+
+    my $id  = $class->datasource . '_id';
+    $self->_do_direct_remove( $arg, { $id => $parent_ids } );
+}
+
+sub _do_migrate_unknown {
+    my ($self, $arg) = @_;
+    state $rf        = MT->component('RetiredFields');
+    state $obsolete  = $rf->registry('obsolete_meta_fields');
+    state $unused    = $rf->registry('unused_meta_fields');
+    my $class        = $arg->{class};
+    my $mtable       = $arg->{mtable};
+    my $ds           = $arg->{ds};
+    my $mcols        = $arg->{classobj}->metacolumns;
+    my $olddb         = $arg->{mpkg}->driver;
+    ###l4p $l4p ||= get_logger();
+
+    my @unknown = map { @{ $_->{$ds} || [] } } $unused, $obsolete;
+    p(@unknown);
+
+    require SQL::Abstract;
+    my $sql = SQL::Abstract->new();
+
+    # Reset object drivers for class and metaclass
+    $self->cfgmgr->use_new_database;
+    $arg->{classobj}->reset_object_drivers();
+    my $newdb = $arg->{mpkg}->driver;
+    $self->cfgmgr->use_old_database;
+
+    foreach my $unknown ( @unknown ) {
+        next if grep { $unknown eq $_->{name} } @$mcols;
+        my( $select, @sbind )
+            = $sql->select( $mtable, ['*'], {$arg->{mtype} => $unknown} );
+        say $select.' '.p(@sbind);
+
+        my ($insert, $isth);
+        my $ssth = $olddb->rw_handle->prepare($select);
+        $ssth->execute(@sbind);
+        while ( my $d = $ssth->fetchrow_hashref ) {
+            $insert ||= $sql->insert($mtable, $d);
+            $isth   ||= $newdb->rw_handle->prepare($insert);
+            say $insert.' '.p($sql->values($d));
+            $isth->execute($sql->values($d));
+        }
+    }
+
+    $self->cfgmgr->use_old_database;
+}
+
+sub _do_remove_obsolete {
+    my ($self, $arg) = @_;
+    state $rf        = MT->component('RetiredFields');
+    state $obsolete  = $rf->registry('obsolete_meta_fields');
+    state $unused    = $rf->registry('unused_meta_fields');
+    my $class  = $arg->{class};
+    my $mtable = $arg->{mtable};
+    my $meta_types = $obsolete->{$arg->{ds}};
+    ###l4p $l4p ||= get_logger();
+
+    return unless @{ $arg->{badmeta}{$class}{type} }
+               && try { @{$arg->{meta_types}} };
+
+    my $msg = "Are you sure you want to remove $mtable rows with the fields "
+            . "above which RetiredFields says are obsolete? (This is "
+            . "destructive and non-reversible!)";
+    p($meta_types);
+    return unless prompt('y', $msg, 'y/n', 'n');
+
+    my $is_unknown = sub {
+        my $v = shift;
+        none { $v eq $_ } @$meta_types ? 1 : 0;
+    };
+
+    my ( $obsoletes, $unhandled )
+        = part { $is_unknown->($_) } @{ $arg->{badmeta}{$class}{type} };
+
+    if ( $obsoletes && @$obsoletes ) {
+        $self->progress("Removing obsolete metadata fields for $class...");
+        p( $obsoletes );
+        $self->_do_direct_remove( $arg, { type => $obsoletes } );
+    }
+
+    if ( $unhandled && @$unhandled ) {
+        $self->progress('Not removing the following fields which '
+              . 'were not specified by the RetiredFields plugin: '
+              . (join(', ', @$unhandled)));
+    }
+}
+
+sub _do_direct_remove {
+    my ( $self, $arg, $terms ) = @_;
+    my $mpkg = $arg->{mpkg};
+    ###l4p $l4p ||= get_logger();
+    try   { $mpkg->driver->direct_remove( $mpkg, $terms ) }
+    catch { $l4p->error($_); exit };
+}
+
+sub _create_check_meta_args {
+    my ($self, %arg) = @_;
+    my $class = $arg{class} = $arg{classobj}->class;
+    my $mpkg  = $arg{mpkg} = $class->meta_pkg;
+    my $mds   = $arg{mds} = $mpkg->datasource;
+    %arg   = (
+        %arg,
+        ds     => $class->datasource,
+        pk     => $class->properties->{primary_key},
+        dbh    => $mpkg->driver->rw_handle,
+        mtable => "mt_${mds}",
+        mtype  => "${mds}_type",
+    );
+    $arg{mpk} = join('_', @arg{'mds','ds','pk'});
+    $arg{badmeta}{$class}{$_} = [] foreach qw( type parent );
+    $arg{counts}{$class}{$_}   = 0 foreach qw( total bad_type bad_parent );
+    local $arg{dbh}{RaiseError}       = 1;
+    local $arg{dbh}{FetchHashKeyName} = 'NAME_lc'; # lc($colnames)
+    return %arg;
 }
 
 sub progress {
