@@ -13,23 +13,23 @@ has mode_handlers => (
     is      => 'ro',
     default => sub {
         {
-            show_counts   => 'do_table_counts',
-            # find_orphans  => 'do_find_orphans',
-            check_meta    => 'do_check_meta',
-            resave_source => 'do_resave_source',
+            showcounts   => 'do_table_counts',
+            checkmeta    => 'do_check_meta',
+            resavesource => 'do_resave_source',
             migrate       => 'do_migrate_verify',
             verify        => 'do_migrate_verify',
             test          => 'do_test',
+            fullmigrate  => 'do_full_migrate_verify'
         }
-    }
+    },
 );
 
 option mode => (
     is      => 'ro',
     format  => 's',
-    doc     => 'REQUIRED run mode: show-counts, resave-source, find-orphans, check-meta-types, migrate, verify, test',
+    doc     => 'REQUIRED run mode: show-counts, resave-source, check-meta, migrate, verify, test. Modes are case-insensitive and the word separator can be a hyphen, an underscore or omitted entirely (checkmeta, check-meta, check_meta, CheckMeta, etc)',
     longdoc => '',
-    coerce  => quote_sub(q( $_[0] =~ tr/-/_/; $_[0] )),
+    coerce  => quote_sub(q( ($_[0] = lc($_[0])) =~ s/[^a-z]//g; $_[0]  )),
     default => 'init_only',
     required => 1,
 );
