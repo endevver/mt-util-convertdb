@@ -1,6 +1,6 @@
 # NAME
 
-convertdb
+mt-util-convertdb
 
 # DESCRIPTION
 
@@ -69,7 +69,7 @@ convertdb \[-h\] \[long options ...\]
     or a small handful of classes.
 
         --skip-classes MT::Log,MT::Log::Entry,MT::Log::Comment[,...]
-        
+
 
 - **--skip\_tables: Array of Strings**
 
@@ -86,7 +86,7 @@ convertdb \[-h\] \[long options ...\]
         --mode migrate --skip-table log
         --mode verify --skip-table log
         --mode showcounts --skip-table log
-        
+
 
 - **--no\_verify:**
 
@@ -213,6 +213,7 @@ Due to a silly little quirk in Movable Type, the utility must be installed as
 - Pod::POM
 - SQL::Abstract
 - Path::Class
+- Pod::Pom
 
 # AUTHOR
 
