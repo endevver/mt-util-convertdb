@@ -45,7 +45,7 @@ option mode => (
     doc      => '[REQUIRED] Run mode: show_counts, resave_source, check_meta, migrate or verify.',
     long_doc => q([REQUIRED] Run modes. See the L</MODES> section for the list of valid values.),
     coerce   => quote_sub(q( ($_[0] = lc($_[0])) =~ s/[^a-z]//g; $_[0]  )),
-    default  => 'init_only',
+    default  => 'initonly',
     required => 1,
     order    => 1,
 );
@@ -287,12 +287,14 @@ sub run {
     try {
         local $SIG{__WARN__} = sub { $l4p->warn( $_[0] ) };
 
-        if ( $self->mode eq 'init_only' ) {
+        if ( $self->mode eq 'initonly' ) {
             $self->progress( 'Class initialization done for '
                     . $self->total_objects
                     . ' objects. '
-                    . 'Exiting without --mode' );
-            p($self);
+                    . 'Exiting without --mode. '
+                    . 'Use --usage, --help or --man flags '
+                    . 'for more information' );
+            ###l4p $l4p->debug('CLI object: ', l4mtdump($self));
         }
         else {
             my $handle   = $self->mode_handlers;
