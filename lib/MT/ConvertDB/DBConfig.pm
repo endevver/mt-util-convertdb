@@ -64,11 +64,9 @@ sub BUILDARGS {
 sub BUILD {
     my $self = shift;
     ###l4p $l4p ||= get_logger();
-    $self->app;
-    $self->driver;
-    $self->finish_init;
-    ###l4p $l4p->info('INITIALIZATION COMPLETE for '.ref($self).': '.$self->label);
-    $self;
+    $self->app && $self->driver && $self->finish_init;
+    ###l4p $l4p->info('INITIALIZATION COMPLETE for '.$self->label);
+    return $self;
 }
 
 sub _trigger_read_only {
@@ -263,7 +261,7 @@ sub use {
     ###l4p $l4p ||= get_logger(); $l4p->trace(1);
     no warnings 'once';
     MT->set_instance( $self->app );
-    $MT::ConfigMgr::cfg                 = $self->app->{cfg};
+    $MT::ConfigMgr::cfg = $self->app->{cfg};
     $self->reset_object_drivers();
     $self;
 }
