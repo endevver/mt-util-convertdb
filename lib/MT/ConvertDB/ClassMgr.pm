@@ -705,11 +705,12 @@ extends 'MT::ConvertDB::ClassMgr::Generic';
 
 sub report_diff {
     my $self = shift;
+    my %args = @_;
 
     # last_run and next_run are reported as migration errors
     # if RPT is run after migration but before verification
     return $self->SUPER::report_diff(@_)
-        unless $_[0]->{key} =~ m{(next|last)_run};
+        unless $args{key} =~ m{(next|last)_run};
 }
 
 #############################################################################
