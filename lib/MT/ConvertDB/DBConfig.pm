@@ -57,8 +57,8 @@ sub BUILDARGS {
     my ( $class, @args ) = @_;
     unshift @args, "file" if @args % 2 == 1;
     ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->info('########## Instantiation for config '.$_[1] );
-    return {@args};
+    ###l4p $l4p->info('#'x10, " Instantiation for config $args[1] ", '#'x10 );
+    return { @args };
 }
 
 sub BUILD {
