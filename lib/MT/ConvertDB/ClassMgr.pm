@@ -5,17 +5,12 @@ use List::MoreUtils qw( uniq );
 use Class::Load qw( try_load_class load_first_existing_class );
 use vars qw( $l4p );
 
-has exclude_tables => (
+has [qw( exclude_tables exclude_classes )] => (
     is      => 'ro',
     default => sub { [] },
 );
 
-has exclude_classes => (
-    is      => 'ro',
-    default => sub { [] },
-);
-
-has include_classes => ( is => 'lazy', );
+has [qw( include_classes class_hierarchy )] => ( is => 'lazy', );
 
 has object_classes => (
     is  => 'lazy',
@@ -24,8 +19,6 @@ has object_classes => (
     ),
     builder => 1
 );
-
-has class_hierarchy => ( is => 'lazy', );
 
 has object_keys => (
     is  => 'rw',

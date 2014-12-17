@@ -183,11 +183,7 @@ option readme => (
     order    => 13,
 );
 
-has classmgr => ( is => 'lazy', );
-
-has cfgmgr => ( is => 'lazy', );
-
-has class_objects => ( is => 'lazy', );
+has [qw( classmgr cfgmgr class_objects )] => ( is => 'lazy', );
 
 has progressbar => (
     is        => 'lazy',

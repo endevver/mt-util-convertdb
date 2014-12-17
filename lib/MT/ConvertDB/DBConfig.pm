@@ -42,12 +42,7 @@ $v->isa('MT::ObjectDriver::Driver::DBI') or die "Bad driver: ".p($v) )
     predicate => 1,
 );
 
-has obj_counts => (
-    is      => 'ro',
-    default => sub { {} },
-);
-
-has ds_truncated => (
+has [qw( obj_counts ds_truncated )] => (
     is      => 'ro',
     default => sub { {} },
 );
