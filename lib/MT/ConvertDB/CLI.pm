@@ -267,7 +267,7 @@ sub _build_table_counts {
         foreach my $classobj (@$class_objs) {
             my $ds = $classobj->ds;
             unless ( $cnts->{$ds}{$which} ) {
-                $cnts->{$ds}{$which} = $db->table_counts($classobj);
+                $cnts->{$ds}{$which} = $db->table_counts($classobj, {}, { no_class => 1, });
                 $total += $cnts->{$ds}{$which}{total};
             }
         }

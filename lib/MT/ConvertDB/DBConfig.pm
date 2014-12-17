@@ -290,7 +290,7 @@ sub table_counts {
     $self->clear_counts($classobj);
 
     my $tally = {
-        object => $self->count($classobj),
+        object => $self->count($classobj, @_),
         meta   => $self->meta_count($classobj),
     };
     delete $tally->{meta} unless defined $tally->{meta};

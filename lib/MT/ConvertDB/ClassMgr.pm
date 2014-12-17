@@ -264,8 +264,6 @@ sub count {
     my ( $terms, $args ) = @_;
     my $class = $self->class;
     $self->reset_object_drivers();
-    $class->_pre_search_scope_terms_to_class( ( $terms ||= {} ), $args )
-        unless UNIVERSAL::isa( $class, 'MT::Object::Meta' );
     return $class->count( $terms, $args ) || 0;
 }
 
