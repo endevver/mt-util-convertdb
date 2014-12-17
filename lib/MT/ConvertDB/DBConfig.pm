@@ -208,9 +208,9 @@ sub check_plugins {
     # Check that certain plugins are NOT loaded
     exists( $MT::Plugins{LDAPTools} )
         && exists( $MT::Plugins{LDAPTools}{object} )
-        and $l4p->logcroak( 'The LDAPTools plugin conflicts with this tool. '
+        and $l4p->logdie( 'The LDAPTools plugin conflicts with this tool. '
             . 'Please remove it from the plugins directory '
-            . 'and re-run' );
+            . 'and re-run');
 }
 
 sub check_schema {
