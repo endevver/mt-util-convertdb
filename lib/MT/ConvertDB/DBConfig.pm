@@ -127,15 +127,7 @@ sub _build_driver {
     my $cfg  = $mt->{cfg};
     ###l4p $l4p ||= get_logger();
 
-    # Undef package variables which will cache any previous config's values
-    require MT::Object;
-    require MT::ObjectDriverFactory;
-    {
-        no warnings 'once';
-        undef $MT::Object::DRIVER;
-        undef $MT::ObjectDriverFactory::DRIVER;
-        undef $MT::ObjectDriverFactory::dbd_class;
-    }
+    $self->reset_object_drivers();
 
     # Avoid ObjectDriverFactory->instance and force the driver to
     # use the fallback non-caching DBI driver for this config
@@ -226,6 +218,7 @@ sub check_schema {
     ###l4p $l4p ||= get_logger(); $l4p->info('Loading/checking database schema');
 
     my %params = ( CLI => 1 );
+    $self->reset_object_drivers();
 
     require MT::Object;
     require MT::Config;
@@ -241,14 +234,24 @@ sub check_schema {
     MT::Upgrade->do_upgrade( %params ) or die MT::Upgrade->errstr;
 }
 
+sub reset_object_drivers {
+    my $self   = shift;
+    my $driver = shift || ( $self->has_driver ? $self->driver : undef );
+    # Undef cached MT::Object and MT::ObjectDriverFactory package variables
+    require MT::Object;
+    require MT::ObjectDriverFactory;
+    no warnings 'once';
+    $MT::ObjectDriverFactory::DRIVER    = $MT::Object::DRIVER = $driver;
+    $MT::ObjectDriverFactory::dbd_class = $driver ? $driver->dbd : undef;
+}
+
 sub use {
     my $self = shift;
     ###l4p $l4p ||= get_logger(); $l4p->trace(1);
     no warnings 'once';
     MT->set_instance( $self->app );
     $MT::ConfigMgr::cfg                 = $self->app->{cfg};
-    $MT::ObjectDriverFactory::DRIVER    = $MT::Object::DRIVER = $self->driver;
-    $MT::ObjectDriverFactory::dbd_class = $self->driver->dbd;
+    $self->reset_object_drivers();
     $self;
 }
 
