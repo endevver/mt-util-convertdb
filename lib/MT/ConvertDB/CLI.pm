@@ -502,7 +502,7 @@ sub do_migrate_verify {
     ###l4p $l4p ||= get_logger();
 
     if ( $self->mode eq 'migrate' ) {
-        ###l4p $l4p->info( "Removing all rows from tables in new database" );
+        ###l4p $l4p->info( "Truncating all tables in destination database" );
         $cfgmgr->newdb->remove_all($_) foreach @$class_objs;
         $self->do_table_counts();
     }

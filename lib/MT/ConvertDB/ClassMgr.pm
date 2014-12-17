@@ -302,7 +302,8 @@ sub remove_all {
     my $self = shift;
     my $class = shift || $self->class;
     ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->info(sprintf('Removing all objects from mt_%s table', $self->ds ));
+    ###l4p $l4p->info(sprintf('Removing all %s objects from mt_%s table',
+    ###l4p     $class, $class->properties->{datasource} ));
 
     $self->remove_all( $class->meta_pkg ) if $class->meta_pkg;
 
