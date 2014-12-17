@@ -69,7 +69,7 @@ sub _trigger_read_only {
     my $self = shift;
     my $val  = shift;
     ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->info(sprintf('Driver for %s is %s', $self->driver->{dsn},
+    ###l4p $l4p->info(sprintf('Driver for %s is %s', $self->file->basename,
     ###l4p     $val ? 'READ ONLY' : 'WRITEABLE' ));
 }
 
