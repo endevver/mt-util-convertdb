@@ -190,6 +190,11 @@ has progressbar => (
     predicate => 1,
 );
 
+has ds_ignore => (
+    is        => 'ro',
+    default   => sub { qr{^(fileinfo|log|touch|trackback|ts_.*)$} },
+);
+
 has total_objects => (
     is        => 'rw',
     predicate => 1,
@@ -333,7 +338,13 @@ sub do_table_counts {
             $mismatch++ if $old->{$type} != $new->{$type};
             push( @data, $old->{$type}, $new->{$type} );
         }
-        $tb->add( "mt_$ds", ( $mismatch ? 'NOT OK' : 'OK' ), @data );
+        if ( $ds =~ $self->ds_ignore ) {
+            $mismatch = 'IGNORE';
+        }
+        else {
+            $mismatch = ( $mismatch ? 'NOT OK' : 'OK' );
+        }
+        $tb->add( "mt_$ds", $mismatch, @data );
     }
     $self->progress("Table counts:\n$tb");
     return $cnt;
@@ -535,6 +546,9 @@ sub verify_record_counts {
         my ( $old, $new ) = map { $cnts->{$ds}{$_}{total} } qw( old new );
         if ( $old == $new ) {
             $self->progress("Object counts match for $ds ");
+        }
+        elsif ( $ds =~ $self->ds_ignore ) {
+            $self->progress("Object counts don't match for $ds (Ignore. Drift data) ");
         }
         else {
             ( $l4p ||= get_logger )
