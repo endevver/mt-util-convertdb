@@ -85,8 +85,8 @@ sub _build_app {
     my $app_class = $self->app_class;
     my $cfg_file  = $self->file->absolute;
     ###l4p $l4p->info("Constructing new app: $app_class");
-    ###l4p $l4p->info('A previous app existed: '.$MT::mt_inst) if $MT::mt_inst;
-    ###l4p $l4p->info('A previous config existed: '.$MT::ConfigMgr::cfg) if $MT::ConfigMgr::cfg;
+    ###l4p $l4p->debug('A previous app existed: '.$MT::mt_inst) if $MT::mt_inst;
+    ###l4p $l4p->debug('A previous config existed: '.$MT::ConfigMgr::cfg) if $MT::ConfigMgr::cfg;
 
     my $mt = try {
         local $SIG{__WARN__} = sub { };
