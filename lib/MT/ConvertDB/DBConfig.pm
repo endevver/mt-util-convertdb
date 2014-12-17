@@ -225,23 +225,20 @@ sub check_schema {
     my $self = shift;
     ###l4p $l4p ||= get_logger(); $l4p->info('Loading/checking database schema');
 
-    # if ( $self->read_only ) {
-    #     require MT::Object;
-    #     require MT::Config;
-    #     my $driver = $self->driver;
-    #     unless ( $driver->table_exists('MT::Config') ) {
-    #         $l4p->warn('mt_config table does not exist. Unsetting read only for driver for '.$self->file.' '.p($driver));
-    #         p($self);
-    #         $self->read_only(0);
-    #     }
-    # }
+    my %params = ( CLI => 1 );
 
+    require MT::Object;
+    require MT::Config;
     require MT::Upgrade;
-    MT::Upgrade->do_upgrade(
-        CLI     => 1,
-        Install => 1,
-        # $self->read_only ? () : ( Install => 1 )
-    ) or die MT::Upgrade->errstr;
+    my $driver = $self->driver;
+    unless ( $driver->table_exists('MT::Config') ) {
+        $l4p->info('mt_config table does not exist. Installing schema for driver from '.$self->file.' '.p($driver));
+        # p($self);
+        $self->read_only(0);
+        $params{Install} = 1;
+    }
+
+    MT::Upgrade->do_upgrade( %params ) or die MT::Upgrade->errstr;
 }
 
 sub use {
@@ -309,9 +306,8 @@ sub remove_all {
     # This remove_all works on the driver level so removing entries also
     # removes pages essentially wiping out the table.  Doing that twice,
     # after one of the two have been migrated yields poor results.
-    return
-        if $self->read_only
-        || $self->ds_truncated->{ $class->datasource }++;
+    return if $self->read_only;
+        #        || $self->ds_truncated->{ $class->datasource }++;
 
     $self->clear_counts($classobj);
     return $classobj->remove_all();
