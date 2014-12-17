@@ -5,12 +5,21 @@ use List::MoreUtils qw( uniq );
 use Class::Load qw( try_load_class load_first_existing_class );
 use vars qw( $l4p );
 
-has [qw( exclude_tables exclude_classes )] => (
-    is      => 'ro',
-    default => sub { [] },
+has include_classes => (
+    is        => 'rw',
+    lazy      => 1,
+    predicate => 1,
+    builder   => 1,
 );
 
-has [qw( include_classes class_hierarchy )] => ( is => 'lazy', );
+has [qw( include_tables exclude_tables exclude_classes )] => (
+    is        => 'rw',
+    default   => sub { [] },
+    lazy      => 1,
+    predicate => 1,
+);
+
+has class_hierarchy => ( is => 'lazy', );
 
 has object_classes => (
     is  => 'lazy',
@@ -38,25 +47,43 @@ my %class_objects_generated;
 
 sub class_objects {
     my $self = shift;
+    Carp::confess( "Extra arguments passed to class_objects" ) if @_;
     my ( $include, $exclude, $excludeds ) = @_;
     ###l4p $l4p ||= get_logger(); $l4p->trace();
 
-    %class_objects_generated = ();
+    %class_objects_generated = (); # Init or re-init
 
-    $include   ||= $self->include_classes;
-    $exclude   ||= $self->exclude_classes;
-    $excludeds ||= $self->exclude_tables;
+    if ( $self->has_include_tables || $self->has_include_classes ) {
+        $include ||= [
+            uniq @{ $self->has_include_classes ? $self->include_classes : [] },
+                 @{ $self->_tables_to_classes( $self->include_tables ) },
+        ];
+        # say "INCLUDE: ".p($include);
+    }
+    else {
+        $exclude ||= [
+            uniq @{ $self->exclude_classes || [] },
+                 @{ $self->_tables_to_classes( $self->exclude_tables || [] ) },
+        ];
+        # $self->exclude_classes($exclude);
+        # say "EXCLUDE: ".p($exclude);
 
-    $self->_filter_excludes(
-        [ map { $self->_mk_class_objects($_) } @$include ] );
+        $include = [
+            grep { !( $_ ~~ $exclude ) }
+                @{ $self->include_classes }   # Uses default
+        ];
+        # say "INCLUDE FILTERED: ".p($include);
+    }
+    # $self->include_classes($include);
+    # say "INCLUDE: ".p($include);
+    return [ map { $self->_mk_class_objects($_) } @$include ];
 }
 
-sub _filter_excludes {
-    my $self  = shift;
-    my $array = shift;
-    [
-        grep { !( $_->class->datasource ~~ $self->exclude_tables ) }
-        grep { !( $_->class ~~ $self->exclude_classes ) } @$array
+sub _tables_to_classes {
+    my ($self, $tables) = ( @_, [] );
+    return [
+        grep { $_->properties->{datasource} ~~ $tables }
+            @{ $self->object_classes }
     ];
 }
 
@@ -92,15 +119,11 @@ sub post_migrate { }
 
 sub _build_object_classes {
     ###l4p $l4p ||= get_logger(); $l4p->trace(1);
-    my @classes;
-    my $types = MT->registry('object_types');    # p($types);
-    foreach my $type ( keys %$types ) {
-
-# object_types value is either a class or an array ref with class as first element
-        push( @classes,
-            ref( $types->{$type} ) ? $types->{$type}[0] : $types->{$type} );
-    }
-    return [ uniq sort @classes ];
+    return [
+        uniq sort map {
+            MT->model($_) } keys %{ MT->registry('object_types')
+        }
+    ];
 }
 
 sub _build_class_hierarchy {
@@ -279,7 +302,7 @@ sub remove_all {
     my $self = shift;
     my $class = shift || $self->class;
     ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->info(sprintf('Removing all %s objects (%s)', $class, ref($self) ));
+    ###l4p $l4p->info(sprintf('Removing all objects from mt_%s table', $self->ds ));
 
     $self->remove_all( $class->meta_pkg ) if $class->meta_pkg;
 

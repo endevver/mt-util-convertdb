@@ -56,7 +56,7 @@ option new_config => (
     required => 1,
     doc      => '[REQUIRED] Path to config file for new database. Can be relative to MT_HOME',
     long_doc => q([REQUIRED] Use this option to specify the path/filename of the MT config file containing the new database information.  It can be an absolute path or relative to MT_HOME (e.g. ./mt-config-new.cgi)),
-    order    => 2,
+    order    => 5,
 );
 
 option old_config => (
@@ -65,7 +65,7 @@ option old_config => (
     doc      => 'Path to current config file. Can be relative to MT_HOME. Defaults to ./mt-config.cgi',
     long_doc => q(Use this to specify the path/filename of the current MT config file.  It defaults to ./mt-config-cgi so you only need to use it if you want to set specific configuration directives which are different than the ones in use in the MT installation.),
     default  => './mt-config.cgi',
-    order    => 3,
+    order    => 10,
 );
 
 option classes => (
@@ -74,20 +74,16 @@ option classes => (
     autosplit => ',',
     default   => sub { [] },
     doc       => 'Classes to include (e.g. MT::Blog). Can be comma-delimited or specified multiple times',
-    long_doc  => q(
-Use this to specify one or more classes you want to act on in the specified
-mode. The value can be comma-delimited or you can specify this option multiple
-times for multiple classes. For example, the following are equivalent:
+    long_doc  => q((B<Note:> You should I<PROBABLY> be using the C<--tables> option instead.) Use this to specify one or
+more classes you want to act on in the specified mode. This is useful if you want to execute a particular
+mode on a one or a few classes of objects. For example:
 
-    --classes MT::Blog --classes MT::Author --classes MT::Entry
-    --classes MT::Blog,MT::Author,MT::Entry
+    --mode migrate --class MT::Template
+    --mode showcounts --classes MT::Author,MT::Template
 
-This is useful if you want to execute a particular mode on a single table or a small handful of tables. For example:
-
-    --mode migrate --class MT::Blog
-    --mode showcounts --class MT::Blog
-    --mode checkmeta --classes MT::Blog,MT::Author,MT::Entry),
-    order     => 4,
+See the C<--tables> option for information on this options multiple-value syntax and parent class
+inclusion.),
+    order     => 25,
 );
 
 option skip_classes => (
@@ -96,13 +92,49 @@ option skip_classes => (
     autosplit => ',',
     default   => sub { [] },
     doc       => 'Classes to skip (e.g. MT::Log). Can be comma-delimited or specified multiple times',
-    long_doc  => q(Use this to specify one or more classes to exclude during execution of the specified mode. This
-is the exact inverse of C<--classes>, has the same syntax and is most useful for excluding one
-or a small handful of classes.
+    long_doc  => q((B<Note:> You should I<PROBABLY> be using the C<--skip-tables> option instead.) Use this to specify one
+or more classes to exclude during execution of the specified mode. It is the exact inverse of the
+C<--classes> option and similar to the C<--skip-tables> option.
 
-    --skip-classes MT::Log,MT::Log::Entry,MT::Log::Comment[,...]
-    ),
-    order     => 5,
+This option is ignored if either C<--tables> or C<--classes> options are specified.),
+    order     => 30,
+);
+
+option tables => (
+    is        => 'ro',
+    format    => 's@',
+    autosplit => ',',
+    default   => sub { [] },
+    doc       => 'Tables to process (omit "mt_" prefix: log). Can be comma-delimited or specified multiple times',
+    long_doc  => q(Use this to specify one or more tables (omitting the C<mt_> prefix) to include during execution of the
+specified mode. It works similarly to C<--classes> but often shorter and more likely what you want since
+it removes the ambiguity of classed objects (MT::Blog/MT::Website, MT::Entry/MT::Page).
+
+For example, the following performs migration of ALL objects in the mt_blog table (which may include
+MT::Blog, MT::Website and MT::Community::Blog objects):
+
+    convertdb --mode migrate --table blog
+
+Like the C<--classes>, C<--skip-classes> and C<--skip-tables> options, multiple values can be specified
+either as a comma-delimited list or separate options and the option name can be singularized for
+readability. For example, the following are equivalent:
+
+        --table blog --table author --table entry
+        --tables blog,author,entry
+
+Also note, like the C<--classes> option, any tables contain objects whose class is a parent of the class
+of objects in your specified tables will also be included. For example, the following:
+
+    convertdb --mode migrate --table comment
+
+...is exactly the same as this:
+
+    convertdb --mode migrate --tables blog,entry,comment
+
+This is because MT::Comment objects are children of MT::Entry/MT::Page objects which themselves are
+children of MT::Blog objects. For reasons of data integrity, there is no way to transfer an object
+without its parent object.),
+    order     => 15,
 );
 
 option skip_tables => (
@@ -111,48 +143,49 @@ option skip_tables => (
     autosplit => ',',
     default   => sub { [] },
     doc       => 'Tables to skip (omit "mt_" prefix: log). Can be comma-delimited or specified multiple times',
-    long_doc  => q(Use this to specify one or more tables to exclude during execution of the specified mode. This
-is similar to C<--skip_classes> but often shorter and more likely what you want. For example,
-the following skips the entire mt_log table and is equivalent to the example above. Note that
-you omit the C<mt_> prefix of the table:
+    long_doc  => q(Use this to specify one or more tables to exclude during execution of the specified mode. See the inverse option C<--tables> for its value syntax.
+
+It operates in a similar manner to C<--skip_classes> but is often shorter and more likely what you want.
+For example, the following skips the entire mt_log table:
 
     --skip-table log
 
-It is recommended that you always use this option (especially with with B<migrate> or B<verify>
-modes) unless you need to preserve your Activity log data:
+Unless you need to preserve your Activity Log records or are using the C<--classes> or C<--tables>
+option, it is recommended to use this option to skip the usually large C<mt_log> table, especially under
+B<migrate> or B<verify> modes:
 
     --mode migrate --skip-table log
     --mode verify --skip-table log
     --mode showcounts --skip-table log
-    ),
-    order     => 6,
+
+This option is ignored if either C<--tables> or C<--classes> options are specified.),
+    order     => 20,
 );
 
 option no_verify => (
     is       => 'ro',
     doc      => '[WITH MODE: migrate] Skip data verification during migration.',
-    long_doc => q(Under B<migrate> mode, this option skips the content and encoding verification for each object
-migrated to the source database. This is useful if you want to quickly perform a migration and
-are confident of the process or plan on verifying later.),
-
+    long_doc => q([B<migrate MODE ONLY>] This option skips the content and encoding verification for each object migrated
+to the source database. This is useful if you want to quickly perform a migration and are confident of
+the process or plan on verifying later.),
     default  => 0,
-    order    => 7,
+    order    => 35,
 );
 
 option migrate_unknown => (
     is       => 'ro',
     doc      => '[WITH MODE: checkmeta] Migrate all unknown metadata.',
-    long_doc => q(Under B<checkmeta> mode, this option cause all metadata records with unregistered field types to be migrated.  This normally doesn't happen under B<migrate> mode which only transfers object metadata with registered field types.'),
+    long_doc => q([B<checkmeta MODE ONLY>] This option cause all metadata records with unregistered field types to be migrated.  This normally doesn't happen under B<migrate> mode which only transfers object metadata with registered field types.'),
     default  => 0,
-    order    => 8,
+    order    => 40,
 );
 
 option remove_orphans => (
     is       => 'ro',
     doc      => '[WITH MODE: checkmeta] Remove found orphans.',
-    long_doc => q(Under B<checkmeta> mode, this removes all metadata records from the source database which are associated with a non-existent object.),
+    long_doc => q([B<checkmeta MODE ONLY>] This removes all metadata records from the source database which are associated with a non-existent object.),
     default  => 0,
-    order    => 9,
+    order    => 45,
 );
 
 option remove_obsolete => (
@@ -168,11 +201,9 @@ option remove_unused => (
 );
 
 option dry_run => (
-    is       => 'rw',
-    doc      => 'DEBUG: Marks new database as read-only for testing during migrate mode',
-    long_doc => q(A debugging option which marks the target database as read-only),
-    default  => 0,
-    order    => 12,
+    is      => 'rw',
+    doc     => 'hidden',
+    default => 0,
 );
 
 option readme => (
@@ -180,10 +211,11 @@ option readme => (
     format   => 's',
     doc      => 'hidden',
     default  => 0,
-    order    => 13,
 );
 
-has [qw( classmgr cfgmgr class_objects )] => ( is => 'lazy', );
+has [qw( classmgr cfgmgr class_objects )] => (
+    is => 'lazy'
+);
 
 has progressbar => (
     is        => 'lazy',
@@ -210,9 +242,14 @@ has table_counts => (
 sub _build_classmgr {
     my $self  = shift;
     my %param = ();
-    $param{include_classes} = $self->classes      if @{ $self->classes };
-    $param{exclude_classes} = $self->skip_classes if @{ $self->skip_classes };
-    $param{exclude_tables}  = $self->skip_tables  if @{ $self->skip_tables };
+    if ( @{ $self->classes } || @{ $self->tables } ) {
+        $param{include_classes} = $self->classes if @{ $self->classes };
+        $param{include_tables}  = $self->tables  if @{ $self->tables };
+    }
+    else {
+        $param{exclude_classes} = $self->skip_classes if @{ $self->skip_classes };
+        $param{exclude_tables}  = $self->skip_tables  if @{ $self->skip_tables };
+    }
     use_module('MT::ConvertDB::ClassMgr')->new(%param);
 }
 
@@ -228,12 +265,7 @@ sub _build_cfgmgr {
 }
 
 sub _build_class_objects {
-    my $self = shift;
-    [
-        grep { !( $_->class->datasource ~~ $self->skip_tables ) }
-        grep { !( $_->class ~~ $self->skip_classes ) }
-                @{ $self->classmgr->class_objects() }
-    ];
+    shift->classmgr->class_objects()
 }
 
 sub _build_progressbar {

@@ -47,64 +47,89 @@ convertdb \[-h\] \[long options ...\]
 
     Use this to specify the path/filename of the current MT config file.  It defaults to ./mt-config-cgi so you only need to use it if you want to set specific configuration directives which are different than the ones in use in the MT installation.
 
-- **--classes: Array of Strings**
+- **--tables: Array of Strings**
 
-    Use this to specify one or more classes you want to act on in the specified
-    mode. The value can be comma-delimited or you can specify this option multiple
-    times for multiple classes. For example, the following are equivalent:
+    Use this to specify one or more tables (omitting the `mt_` prefix) to include during execution of the
+    specified mode. It works similarly to `--classes` but often shorter and more likely what you want since
+    it removes the ambiguity of classed objects (MT::Blog/MT::Website, MT::Entry/MT::Page).
 
-        --classes MT::Blog --classes MT::Author --classes MT::Entry
-        --classes MT::Blog,MT::Author,MT::Entry
+    For example, the following performs migration of ALL objects in the mt\_blog table (which may include
+    MT::Blog, MT::Website and MT::Community::Blog objects):
 
-    This is useful if you want to execute a particular mode on a single table or a small handful of tables. For example:
+        convertdb --mode migrate --table blog
 
-        --mode migrate --class MT::Blog
-        --mode showcounts --class MT::Blog
-        --mode checkmeta --classes MT::Blog,MT::Author,MT::Entry
+    Like the `--classes`, `--skip-classes` and `--skip-tables` options, multiple values can be specified
+    either as a comma-delimited list or separate options and the option name can be singularized for
+    readability. For example, the following are equivalent:
 
-- **--skip\_classes: Array of Strings**
+            --table blog --table author --table entry
+            --tables blog,author,entry
 
-    Use this to specify one or more classes to exclude during execution of the specified mode. This
-    is the exact inverse of `--classes`, has the same syntax and is most useful for excluding one
-    or a small handful of classes.
+    Also note, like the `--classes` option, any tables contain objects whose class is a parent of the class
+    of objects in your specified tables will also be included. For example, the following:
 
-        --skip-classes MT::Log,MT::Log::Entry,MT::Log::Comment[,...]
+        convertdb --mode migrate --table comment
 
+    ...is exactly the same as this:
+
+        convertdb --mode migrate --tables blog,entry,comment
+
+    This is because MT::Comment objects are children of MT::Entry/MT::Page objects which themselves are
+    children of MT::Blog objects. For reasons of data integrity, there is no way to transfer an object
+    without its parent object.
 
 - **--skip\_tables: Array of Strings**
 
-    Use this to specify one or more tables to exclude during execution of the specified mode. This
-    is similar to `--skip_classes` but often shorter and more likely what you want. For example,
-    the following skips the entire mt\_log table and is equivalent to the example above. Note that
-    you omit the `mt_` prefix of the table:
+    Use this to specify one or more tables to exclude during execution of the specified mode. See the inverse option `--tables` for its value syntax.
+
+    It operates in a similar manner to `--skip_classes` but is often shorter and more likely what you want.
+    For example, the following skips the entire mt\_log table:
 
         --skip-table log
 
-    It is recommended that you always use this option (especially with with **migrate** or **verify**
-    modes) unless you need to preserve your Activity log data:
+    Unless you need to preserve your Activity Log records or are using the `--classes` or `--tables`
+    option, it is recommended to use this option to skip the usually large `mt_log` table, especially under
+    **migrate** or **verify** modes:
 
         --mode migrate --skip-table log
         --mode verify --skip-table log
         --mode showcounts --skip-table log
 
+    This option is ignored if either `--tables` or `--classes` options are specified.
+
+- **--classes: Array of Strings**
+
+    (**Note:** You should _PROBABLY_ be using the `--tables` option instead.) Use this to specify one or
+    more classes you want to act on in the specified mode. This is useful if you want to execute a particular
+    mode on a one or a few classes of objects. For example:
+
+        --mode migrate --class MT::Template
+        --mode showcounts --classes MT::Author,MT::Template
+
+    See the `--tables` option for information on this options multiple-value syntax and parent class
+    inclusion.
+
+- **--skip\_classes: Array of Strings**
+
+    (**Note:** You should _PROBABLY_ be using the `--skip-tables` option instead.) Use this to specify one
+    or more classes to exclude during execution of the specified mode. It is the exact inverse of the
+    `--classes` option and similar to the `--skip-tables` option.
+
+    This option is ignored if either `--tables` or `--classes` options are specified.
 
 - **--no\_verify:**
 
-    Under **migrate** mode, this option skips the content and encoding verification for each object
-    migrated to the source database. This is useful if you want to quickly perform a migration and
-    are confident of the process or plan on verifying later.
+    \[**migrate MODE ONLY**\] This option skips the content and encoding verification for each object migrated
+    to the source database. This is useful if you want to quickly perform a migration and are confident of
+    the process or plan on verifying later.
 
 - **--migrate\_unknown:**
 
-    Under **checkmeta** mode, this option cause all metadata records with unregistered field types to be migrated.  This normally doesn't happen under **migrate** mode which only transfers object metadata with registered field types.'
+    \[**checkmeta MODE ONLY**\] This option cause all metadata records with unregistered field types to be migrated.  This normally doesn't happen under **migrate** mode which only transfers object metadata with registered field types.'
 
 - **--remove\_orphans:**
 
-    Under **checkmeta** mode, this removes all metadata records from the source database which are associated with a non-existent object.
-
-- **--dry\_run:**
-
-    A debugging option which marks the target database as read-only
+    \[**checkmeta MODE ONLY**\] This removes all metadata records from the source database which are associated with a non-existent object.
 
 - **--usage:**
 
@@ -213,7 +238,6 @@ Due to a silly little quirk in Movable Type, the utility must be installed as
 - Pod::POM
 - SQL::Abstract
 - Path::Class
-- Pod::Pom
 
 # AUTHOR
 
