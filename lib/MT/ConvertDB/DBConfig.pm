@@ -235,11 +235,16 @@ sub check_schema {
 
     $self->reset_object_drivers();
 
+    my $dbh = $self->driver->rw_handle;
+    local $dbh->{RaiseError} = 0;  # Upgrade doesn't handle its own exceptions
+    local $SIG{__WARN__} = sub { $l4p->warn(@_) }; # Re-route warnings
+
     require MT::Upgrade;
     MT::Upgrade->do_upgrade( CLI => 1, Install => $self->needs_install )
         or die MT::Upgrade->errstr;
 
     $self->clear_needs_install;
+    return 1;
 }
 
 sub reset_object_drivers {
