@@ -11,6 +11,12 @@ has read_only => (
     predicate => 1,
 );
 
+has needs_install => (
+    is        => 'rw',
+    default   => 0,
+    clearer   => 1,
+);
+
 has app_class => (
     is      => 'ro',
     default => 'MT::App::CMS',
@@ -143,6 +149,13 @@ sub _build_driver {
         ( $pwd   ? ( password => $pwd )   : () ),
     );
 
+    unless ( $driver->table_exists(MT->model('config')) ) {
+        $l4p->info(sprintf( 'Schema init required for dsn in %s: %s',
+                            $self->file->basename, $driver->{dsn} ) );
+        $self->read_only(0) if $self->read_only;
+        $self->needs_install(1);
+    }
+
     ###l4p $l4p->info('Objectdriver configured: '.$driver->{dsn});
     no warnings 'once';
     push( @MT::ObjectDriverFactory::drivers, $driver );
@@ -215,23 +228,18 @@ sub check_plugins {
 
 sub check_schema {
     my $self = shift;
-    ###l4p $l4p ||= get_logger(); $l4p->info('Loading/checking database schema');
+    ###l4p $l4p ||= get_logger();
+    ###l4p $l4p->info(sprintf('Checking schema [%s %s %s]',
+    ###l4p     $self->file->basename, $self->driver->{dsn},
+    ###l4p     $self->needs_install ? 'NEEDS INSTALL' : ''));
 
-    my %params = ( CLI => 1 );
     $self->reset_object_drivers();
 
-    require MT::Object;
-    require MT::Config;
     require MT::Upgrade;
-    my $driver = $self->driver;
-    unless ( $driver->table_exists('MT::Config') ) {
-        $l4p->info('mt_config table does not exist. Installing schema for driver from '.$self->file.' '.p($driver));
-        # p($self);
-        $self->read_only(0);
-        $params{Install} = 1;
-    }
+    MT::Upgrade->do_upgrade( CLI => 1, Install => $self->needs_install )
+        or die MT::Upgrade->errstr;
 
-    MT::Upgrade->do_upgrade( %params ) or die MT::Upgrade->errstr;
+    $self->clear_needs_install;
 }
 
 sub reset_object_drivers {
