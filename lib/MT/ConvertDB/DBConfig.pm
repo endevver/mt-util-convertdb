@@ -73,8 +73,19 @@ sub _trigger_read_only {
     my $self = shift;
     my $val  = shift;
     ###l4p $l4p ||= get_logger();
+
+    if ( $self->has_driver ) {
+        my $dbh = $self->driver->rw_handle;
+        if ( $val != ($dbh->{ReadOnly} || 0) ) {
+            $dbh->{ReadOnly} = $val;
+            ###l4p $l4p->info(sprintf('Driver dbh for %s set to %s', $self->label,
+            ###l4p     $val ? 'READ ONLY' : 'WRITEABLE' ));
+        }
+    }
+    else {
         ###l4p $l4p->info(sprintf('Driver dbh for %s set to %s', $self->label,
         ###l4p     $val ? 'READ ONLY' : 'WRITEABLE' ));
+    }
 }
 
 sub _build_app {
@@ -152,6 +163,12 @@ sub _build_driver {
                             $self->file->basename, $driver->{dsn} ) );
         $self->read_only(0) if $self->read_only;
         $self->needs_install(1);
+    }
+
+    if ( $self->read_only ) {
+        $driver->rw_handle->{ReadOnly} = 1;
+        ###l4p $l4p->info(sprintf('Driver dbh for %s set to %s', $self->label,
+        ###l4p     'READ ONLY' ));
     }
 
     ###l4p $l4p->info('Objectdriver configured: '.$driver->{dsn});
