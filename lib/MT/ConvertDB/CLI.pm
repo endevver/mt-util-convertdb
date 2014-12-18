@@ -281,8 +281,9 @@ sub _build_progressbar {
     );
     $p->max_update_rate(1);
     $p->minor(0);
-    ###l4p $l4p->info(sprintf('Initialized progress bar with %d objects: ',
-    ###l4p              $self->total_objects), l4mtdump($p));
+    ###l4p my $msg = 'Initialized progress bar with %d objects: ';
+    ###l4p $l4p->info(sprintf( $msg, $self->total_objects ));
+    ###l4p $l4p->debug('Progress bar object: ', l4mtdump($p));
     $p;
 }
 

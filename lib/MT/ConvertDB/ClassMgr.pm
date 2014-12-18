@@ -333,7 +333,7 @@ sub load_iter {
     my ( $terms, $args ) = @_;
     my $class = $self->class;
     ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->info(sprintf('Getting iter for %s objects (%s)', $class, ref($self) ));
+    ###l4p $l4p->debug(sprintf('Getting iter for %s objects (%s)', $class, ref($self) ));
     my $iter = $self->class->load_iter( $terms, $args );
 }
 
@@ -500,7 +500,7 @@ sub _object_diff {
             $diff = DBI::data_diff( $old, $new );
         }
         else {
-            $l4p->info( 'Using Test::Deep::NoTest::eq_deeply for '
+            $l4p->debug( 'Using Test::Deep::NoTest::eq_deeply for '
                     . $d{class}
                     . ' object comparison.' );
             require Test::Deep::NoTest;
