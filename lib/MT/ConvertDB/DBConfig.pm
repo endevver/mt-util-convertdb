@@ -48,7 +48,7 @@ $v->isa('MT::ObjectDriver::Driver::DBI') or die "Bad driver: ".p($v) )
     predicate => 1,
 );
 
-has [qw( obj_counts ds_truncated )] => (
+has [qw( obj_counts )] => (
     is      => 'ro',
     default => sub { {} },
 );
@@ -316,12 +316,7 @@ sub remove_all {
     my $classobj = shift;
     my $class    = $classobj->class;
     ###l4p $l4p ||= get_logger();
-
-    # This remove_all works on the driver level so removing entries also
-    # removes pages essentially wiping out the table.  Doing that twice,
-    # after one of the two have been migrated yields poor results.
     return if $self->read_only;
-        #        || $self->ds_truncated->{ $class->datasource }++;
 
     $self->clear_counts($classobj);
     return $classobj->remove_all();
