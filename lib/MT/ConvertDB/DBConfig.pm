@@ -12,9 +12,9 @@ has read_only => (
 );
 
 has needs_install => (
-    is        => 'rw',
-    default   => 0,
-    clearer   => 1,
+    is      => 'rw',
+    default => 0,
+    clearer => 1,
 );
 
 has app_class => (
@@ -58,7 +58,7 @@ sub BUILDARGS {
     unshift @args, "file" if @args % 2 == 1;
     ###l4p $l4p ||= get_logger();
     ###l4p $l4p->info('#'x10, " Instantiation for config $args[1] ", '#'x10 );
-    return { @args };
+    return {@args};
 }
 
 sub BUILD {
@@ -76,7 +76,7 @@ sub _trigger_read_only {
 
     if ( $self->has_driver ) {
         my $dbh = $self->driver->rw_handle;
-        if ( $val != ($dbh->{ReadOnly} || 0) ) {
+        if ( $val != ( $dbh->{ReadOnly} || 0 ) ) {
             $dbh->{ReadOnly} = $val;
             ###l4p $l4p->info(sprintf('Driver dbh for %s set to %s', $self->label,
             ###l4p     $val ? 'READ ONLY' : 'WRITEABLE' ));
@@ -158,9 +158,13 @@ sub _build_driver {
         ( $pwd   ? ( password => $pwd )   : () ),
     );
 
-    unless ( $driver->table_exists(MT->model('config')) ) {
-        $l4p->info(sprintf( 'Schema init required for dsn in %s: %s',
-                            $self->file->basename, $driver->{dsn} ) );
+    unless ( $driver->table_exists( MT->model('config') ) ) {
+        $l4p->info(
+            sprintf(
+                'Schema init required for dsn in %s: %s',
+                $self->file->basename, $driver->{dsn}
+            )
+        );
         $self->read_only(0) if $self->read_only;
         $self->needs_install(1);
     }
@@ -238,7 +242,7 @@ sub check_plugins {
         && exists( $MT::Plugins{LDAPTools}{object} )
         and $l4p->logdie( 'The LDAPTools plugin conflicts with this tool. '
             . 'Please remove it from the plugins directory '
-            . 'and re-run');
+            . 'and re-run' );
 }
 
 sub check_schema {
@@ -251,7 +255,7 @@ sub check_schema {
 
     my $dbh = $self->driver->rw_handle;
     local $dbh->{RaiseError} = 0;  # Upgrade doesn't handle its own exceptions
-    local $SIG{__WARN__} = sub { $l4p->warn(@_) }; # Re-route warnings
+    local $SIG{__WARN__} = sub { $l4p->warn(@_) };    # Re-route warnings
 
     require MT::Upgrade;
     MT::Upgrade->do_upgrade( CLI => 1, Install => $self->needs_install )
@@ -262,13 +266,14 @@ sub check_schema {
 }
 
 sub reset_object_drivers {
-    my $self   = shift;
+    my $self = shift;
     my $driver = shift || ( $self->has_driver ? $self->driver : undef );
+
     # Undef cached MT::Object and MT::ObjectDriverFactory package variables
     require MT::Object;
     require MT::ObjectDriverFactory;
     no warnings 'once';
-    $MT::ObjectDriverFactory::DRIVER    = $MT::Object::DRIVER = $driver;
+    $MT::ObjectDriverFactory::DRIVER = $MT::Object::DRIVER = $driver;
     $MT::ObjectDriverFactory::dbd_class = $driver ? $driver->dbd : undef;
 }
 
@@ -317,7 +322,7 @@ sub table_counts {
     $self->clear_counts($classobj);
 
     my $tally = {
-        object => $self->count($classobj, @_),
+        object => $self->count( $classobj, @_ ),
         meta   => $self->meta_count($classobj),
     };
     delete $tally->{meta} unless defined $tally->{meta};
@@ -336,7 +341,7 @@ sub remove_all {
         $self->clear_counts($classobj);
         return $classobj->remove_all();
     }
-    confess "remove_all attempted on read-only database ".$self->label;
+    confess "remove_all attempted on read-only database " . $self->label;
 }
 
 sub save {
@@ -346,7 +351,7 @@ sub save {
 
     return $classobj->save($obj) unless $self->read_only;
 
-    confess "Save attempted on read-only database ".$self->label;
+    confess "Save attempted on read-only database " . $self->label;
 
     ###l4p $l4p->debug(sprintf('FAKE saving %s%s',
     ###l4p     $classobj->class,
@@ -357,7 +362,10 @@ sub label {
     my $self     = shift;
     my $file     = $self->has_file ? $self->file->basename : '';
     my $readonly = $self->read_only ? 'READ ONLY' : 'WRITEABLE';
-    my $dsn      = $self->has_driver ? $self->driver->{dsn} : $self->app->config->Database;
+    my $dsn
+        = $self->has_driver
+        ? $self->driver->{dsn}
+        : $self->app->config->Database;
     return "[${file}:${dsn} $readonly]";
 }
 

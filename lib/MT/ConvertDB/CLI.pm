@@ -10,40 +10,43 @@ use Pod::Usage qw( pod2usage );
 
 use Pod::POM;
 my ( @POD_EXTRACT, %MooXOptions, $parser, $pom );
+
 BEGIN {
     @POD_EXTRACT = qw( name synopsis description );
     $parser      = Pod::POM->new;
     $pom         = $parser->parse(__FILE__) or die $parser->error();
     for my $head1 ( $pom->head1 ) {
-        my $label = lc($head1->title);
+        my $label = lc( $head1->title );
         next unless grep { $label eq $_ } @POD_EXTRACT;
         $MooXOptions{$label} = $head1->content;
     }
+
     # $MooXOptions{flavour} = [qw( pass_through )];
 }
-use MooX::Options ( %MooXOptions );
+use MooX::Options (%MooXOptions);
 use vars qw( $l4p );
 
 has mode_handlers => (
     is      => 'ro',
     default => sub {
-        {
-            showcounts   => 'do_table_counts',
+        {   showcounts   => 'do_table_counts',
             checkmeta    => 'do_check_meta',
             resavesource => 'do_resave_source',
             migrate      => 'do_migrate_verify',
             verify       => 'do_migrate_verify',
             test         => 'do_test',
             fullmigrate  => 'do_full_migrate_verify'
-        }
+        };
     },
 );
 
 option mode => (
-    is       => 'ro',
-    format   => 's',
-    doc      => '[REQUIRED] Run mode: show_counts, resave_source, check_meta, migrate or verify.',
-    long_doc => q([REQUIRED] Run modes. See the L</MODES> section for the list of valid values.),
+    is     => 'rw',
+    format => 's',
+    doc =>
+        '[REQUIRED] Run mode: show_counts, resave_source, check_meta, migrate or verify.',
+    long_doc =>
+        q([REQUIRED] Run modes. See the L</MODES> section for the list of valid values.),
     coerce   => quote_sub(q( ($_[0] = lc($_[0])) =~ s/[^a-z]//g; $_[0]  )),
     default  => 'initonly',
     required => 1,
@@ -54,18 +57,22 @@ option new_config => (
     is       => 'ro',
     format   => 's',
     required => 1,
-    doc      => '[REQUIRED] Path to config file for new database. Can be relative to MT_HOME',
-    long_doc => q([REQUIRED] Use this option to specify the path/filename of the MT config file containing the new database information.  It can be an absolute path or relative to MT_HOME (e.g. ./mt-config-new.cgi)),
-    order    => 5,
+    doc =>
+        '[REQUIRED] Path to config file for new database. Can be relative to MT_HOME',
+    long_doc =>
+        q([REQUIRED] Use this option to specify the path/filename of the MT config file containing the new database information.  It can be an absolute path or relative to MT_HOME (e.g. ./mt-config-new.cgi)),
+    order => 5,
 );
 
 option old_config => (
-    is       => 'ro',
-    format   => 's',
-    doc      => 'Path to current config file. Can be relative to MT_HOME. Defaults to ./mt-config.cgi',
-    long_doc => q(Use this to specify the path/filename of the current MT config file.  It defaults to ./mt-config-cgi so you only need to use it if you want to set specific configuration directives which are different than the ones in use in the MT installation.),
-    default  => './mt-config.cgi',
-    order    => 10,
+    is     => 'ro',
+    format => 's',
+    doc =>
+        'Path to current config file. Can be relative to MT_HOME. Defaults to ./mt-config.cgi',
+    long_doc =>
+        q(Use this to specify the path/filename of the current MT config file.  It defaults to ./mt-config-cgi so you only need to use it if you want to set specific configuration directives which are different than the ones in use in the MT installation.),
+    default => './mt-config.cgi',
+    order   => 10,
 );
 
 option classes => (
@@ -73,8 +80,10 @@ option classes => (
     format    => 's@',
     autosplit => ',',
     default   => sub { [] },
-    doc       => 'Classes to include (e.g. MT::Blog). Can be comma-delimited or specified multiple times',
-    long_doc  => q((B<Note:> You should I<PROBABLY> be using the C<--tables> option instead.) Use this to specify one or
+    doc =>
+        'Classes to include (e.g. MT::Blog). Can be comma-delimited or specified multiple times',
+    long_doc =>
+        q((B<Note:> You should I<PROBABLY> be using the C<--tables> option instead.) Use this to specify one or
 more classes you want to act on in the specified mode. This is useful if you want to execute a particular
 mode on a one or a few classes of objects. For example:
 
@@ -83,7 +92,7 @@ mode on a one or a few classes of objects. For example:
 
 See the C<--tables> option for information on this options multiple-value syntax and parent class
 inclusion.),
-    order     => 25,
+    order => 25,
 );
 
 option skip_classes => (
@@ -91,13 +100,15 @@ option skip_classes => (
     format    => 's@',
     autosplit => ',',
     default   => sub { [] },
-    doc       => 'Classes to skip (e.g. MT::Log). Can be comma-delimited or specified multiple times',
-    long_doc  => q((B<Note:> You should I<PROBABLY> be using the C<--skip-tables> option instead.) Use this to specify one
+    doc =>
+        'Classes to skip (e.g. MT::Log). Can be comma-delimited or specified multiple times',
+    long_doc =>
+        q((B<Note:> You should I<PROBABLY> be using the C<--skip-tables> option instead.) Use this to specify one
 or more classes to exclude during execution of the specified mode. It is the exact inverse of the
 C<--classes> option and similar to the C<--skip-tables> option.
 
 This option is ignored if either C<--tables> or C<--classes> options are specified.),
-    order     => 30,
+    order => 30,
 );
 
 option tables => (
@@ -105,8 +116,10 @@ option tables => (
     format    => 's@',
     autosplit => ',',
     default   => sub { [] },
-    doc       => 'Tables to process (omit "mt_" prefix: log). Can be comma-delimited or specified multiple times',
-    long_doc  => q(Use this to specify one or more tables (omitting the C<mt_> prefix) to include during execution of the
+    doc =>
+        'Tables to process (omit "mt_" prefix: log). Can be comma-delimited or specified multiple times',
+    long_doc =>
+        q(Use this to specify one or more tables (omitting the C<mt_> prefix) to include during execution of the
 specified mode. It works similarly to C<--classes> but often shorter and more likely what you want since
 it removes the ambiguity of classed objects (MT::Blog/MT::Website, MT::Entry/MT::Page).
 
@@ -134,7 +147,7 @@ of objects in your specified tables will also be included. For example, the foll
 This is because MT::Comment objects are children of MT::Entry/MT::Page objects which themselves are
 children of MT::Blog objects. For reasons of data integrity, there is no way to transfer an object
 without its parent object.),
-    order     => 15,
+    order => 15,
 );
 
 option skip_tables => (
@@ -142,8 +155,10 @@ option skip_tables => (
     format    => 's@',
     autosplit => ',',
     default   => sub { [] },
-    doc       => 'Tables to skip (omit "mt_" prefix: log). Can be comma-delimited or specified multiple times',
-    long_doc  => q(Use this to specify one or more tables to exclude during execution of the specified mode. See the inverse option C<--tables> for its value syntax.
+    doc =>
+        'Tables to skip (omit "mt_" prefix: log). Can be comma-delimited or specified multiple times',
+    long_doc =>
+        q(Use this to specify one or more tables to exclude during execution of the specified mode. See the inverse option C<--tables> for its value syntax.
 
 It operates in a similar manner to C<--skip_classes> but is often shorter and more likely what you want.
 For example, the following skips the entire mt_log table:
@@ -159,35 +174,38 @@ B<migrate> or B<verify> modes:
     --mode showcounts --skip-table log
 
 This option is ignored if either C<--tables> or C<--classes> options are specified.),
-    order     => 20,
+    order => 20,
 );
 
 option no_verify => (
-    is       => 'ro',
-    doc      => '[WITH MODE: migrate] Skip data verification during migration.',
-    long_doc => q([B<migrate MODE ONLY>] This option skips the content and encoding verification for each object migrated
+    is  => 'ro',
+    doc => '[WITH MODE: migrate] Skip data verification during migration.',
+    long_doc =>
+        q([B<migrate MODE ONLY>] This option skips the content and encoding verification for each object migrated
 to the source database. This is useful if you want to quickly perform a migration and are confident of
 the process or plan on verifying later.),
-    default  => 0,
-    order    => 35,
+    default => 0,
+    order   => 35,
 );
 
 option migrate_unknown => (
-    is       => 'rw',
-    doc      => '[WITH MODE: checkmeta] Migrate all unknown metadata.',
-    long_doc => q([B<checkmeta MODE ONLY>] This option cause all metadata records with
+    is  => 'rw',
+    doc => '[WITH MODE: checkmeta] Migrate all unknown metadata.',
+    long_doc =>
+        q([B<checkmeta MODE ONLY>] This option cause all metadata records with
 unregistered field types to be migrated. This step now occurs during migrate
 mode so there should be no need to run it separately.'),
-    default  => 0,
-    order    => 40,
+    default => 0,
+    order   => 40,
 );
 
 option remove_orphans => (
-    is       => 'ro',
-    doc      => '[WITH MODE: checkmeta] Remove found orphans.',
-    long_doc => q([B<checkmeta MODE ONLY>] This removes all metadata records from the source database which are associated with a non-existent object.),
-    default  => 0,
-    order    => 45,
+    is  => 'ro',
+    doc => '[WITH MODE: checkmeta] Remove found orphans.',
+    long_doc =>
+        q([B<checkmeta MODE ONLY>] This removes all metadata records from the source database which are associated with a non-existent object.),
+    default => 0,
+    order   => 45,
 );
 
 option remove_obsolete => (
@@ -209,15 +227,13 @@ option dry_run => (
 );
 
 option readme => (
-    is       => 'ro',
-    format   => 's',
-    doc      => 'hidden',
-    default  => 0,
+    is      => 'ro',
+    format  => 's',
+    doc     => 'hidden',
+    default => 0,
 );
 
-has [qw( classmgr cfgmgr class_objects )] => (
-    is => 'lazy'
-);
+has [qw( classmgr cfgmgr class_objects )] => ( is => 'lazy' );
 
 has progressbar => (
     is        => 'lazy',
@@ -225,8 +241,8 @@ has progressbar => (
 );
 
 has ds_ignore => (
-    is        => 'ro',
-    default   => sub { qr{^(fileinfo|log|touch|trackback|ts_.*)$} },
+    is      => 'ro',
+    default => sub {qr{^(fileinfo|log|touch|trackback|ts_.*)$}},
 );
 
 has total_objects => (
@@ -249,8 +265,10 @@ sub _build_classmgr {
         $param{include_tables}  = $self->tables  if @{ $self->tables };
     }
     else {
-        $param{exclude_classes} = $self->skip_classes if @{ $self->skip_classes };
-        $param{exclude_tables}  = $self->skip_tables  if @{ $self->skip_tables };
+        $param{exclude_classes} = $self->skip_classes
+            if @{ $self->skip_classes };
+        $param{exclude_tables} = $self->skip_tables
+            if @{ $self->skip_tables };
     }
     use_module('MT::ConvertDB::ClassMgr')->new(%param);
 }
@@ -267,7 +285,7 @@ sub _build_cfgmgr {
 }
 
 sub _build_class_objects {
-    shift->classmgr->class_objects()
+    shift->classmgr->class_objects();
 }
 
 sub _build_progressbar {
@@ -302,7 +320,8 @@ sub _build_table_counts {
         foreach my $classobj (@$class_objs) {
             my $ds = $classobj->ds;
             unless ( $cnts->{$ds}{$which} ) {
-                $cnts->{$ds}{$which} = $db->table_counts($classobj, {}, { no_class => 1, });
+                $cnts->{$ds}{$which}
+                    = $db->table_counts( $classobj, {}, { no_class => 1, } );
                 $total += $cnts->{$ds}{$which}{total};
             }
         }
@@ -334,8 +353,8 @@ sub run {
         }
         else {
             my $handle   = $self->mode_handlers;
-            my $methname = $handle->{$self->mode}
-                or die "Unknown mode: ".$self->mode;
+            my $methname = $handle->{ $self->mode }
+                or die "Unknown mode: " . $self->mode;
             my $meth = $self->can($methname);
             $self->$meth();
         }
@@ -354,14 +373,8 @@ sub do_table_counts {
 
     use Text::Table;
     my $tb = Text::Table->new(
-        "Table",
-        "Status",
-        "Old",
-        "New",
-        "Obj-Old",
-        "Obj-New",
-        "Meta-Old",
-        "Meta-New"
+        "Table",   "Status",  "Old",      "New",
+        "Obj-Old", "Obj-New", "Meta-Old", "Meta-New"
     );
     foreach my $ds ( sort keys $cnt ) {
         my $old = $cnt->{$ds}{old};
@@ -386,10 +399,10 @@ sub do_table_counts {
 }
 
 sub do_check_meta {
-    my ($self, $class_objs) = @_;
-    my $cfgmgr     = $self->cfgmgr;
-    my $classmgr   = $self->classmgr;
-    $class_objs  ||= $self->class_objects;
+    my ( $self, $class_objs ) = @_;
+    my $cfgmgr   = $self->cfgmgr;
+    my $classmgr = $self->classmgr;
+    $class_objs ||= $self->class_objects;
     ###l4p $l4p ||= get_logger();
     require MT::Meta;
 
@@ -397,7 +410,7 @@ sub do_check_meta {
 
     foreach my $classobj (@$class_objs) {
         my $class = $classobj->class;
-        my @isa   = try { no strict 'refs'; @{$class.'::ISA'} };
+        my @isa = try { no strict 'refs'; @{ $class . '::ISA' } };
         next unless grep { $_ eq 'MT::Object' } @isa;
 
         # Reset object drivers for class and metaclass
@@ -406,13 +419,14 @@ sub do_check_meta {
 
         next unless MT::Meta->has_own_metadata_of($class);
 
-        my $arg = $self->_create_check_meta_args({
-            classobj => $classobj,
-            counts   => \%counts,
-            badmeta  => \%badmeta,
-        });
+        my $arg = $self->_create_check_meta_args(
+            {   classobj => $classobj,
+                counts   => \%counts,
+                badmeta  => \%badmeta,
+            }
+        );
         local $arg->{dbh}{RaiseError}       = 1;
-        local $arg->{dbh}{FetchHashKeyName} = 'NAME_lc'; # lc($colnames)
+        local $arg->{dbh}{FetchHashKeyName} = 'NAME_lc';    # lc($colnames)
 
         $self->progress("Checking $class metadata...")
             unless $self->mode eq 'migrate';
@@ -440,17 +454,16 @@ sub do_check_meta {
     }
 
     delete $badmeta{$_}{type}
-        for grep { ! @{$badmeta{$_}{type}} } keys %badmeta;
+        for grep { !@{ $badmeta{$_}{type} } } keys %badmeta;
     delete $badmeta{$_}{parent}
-        for grep { ! @{$badmeta{$_}{parent}} } keys %badmeta;
-    delete $badmeta{$_}
-        for grep { ! %{ $badmeta{$_} } } keys %badmeta;
+        for grep { !@{ $badmeta{$_}{parent} } } keys %badmeta;
+    delete $badmeta{$_} for grep { !%{ $badmeta{$_} } } keys %badmeta;
 
     if ( %badmeta and $self->mode ne 'migrate' ) {
         my $label = 'Orphaned metadata fields:';
         say $label;
         p(%badmeta);
-        $l4p->info( $label, l4mtdump(\%badmeta) );
+        $l4p->info( $label, l4mtdump( \%badmeta ) );
     }
 }
 
@@ -543,7 +556,7 @@ sub do_migrate_verify {
                 if $self->mode eq 'migrate';
 
             $self->verify_migration( $classobj, $obj, $meta )
-                if $self->mode eq 'verify' or ! $self->no_verify;
+                if $self->mode eq 'verify' or !$self->no_verify;
 
             $count += 1 + scalar( keys %$meta );
             $next_update = $self->progressbar->update($count)
@@ -552,7 +565,7 @@ sub do_migrate_verify {
             $cfgmgr->use_old_database();
         }
 
-        $self->do_check_meta([$classobj]);
+        $self->do_check_meta( [$classobj] );
 
         $cfgmgr->post_migrate_class($classobj) unless $self->dry_run;
     }
@@ -560,7 +573,7 @@ sub do_migrate_verify {
     $self->progress("Processing of ALL OBJECTS complete.");
 
     $self->verify_record_counts()
-        if $self->mode eq 'verify' or ! $self->no_verify;
+        if $self->mode eq 'verify' or !$self->no_verify;
 
     $self->progressbar->update( $self->total_objects );
 }
@@ -596,7 +609,8 @@ sub verify_record_counts {
             $self->progress("Object counts match for $ds ");
         }
         elsif ( $ds =~ $self->ds_ignore ) {
-            $self->progress("Object counts don't match for $ds (Ignore. Drift data) ");
+            $self->progress(
+                "Object counts don't match for $ds (Ignore. Drift data) ");
         }
         else {
             ( $l4p ||= get_logger )
@@ -607,79 +621,85 @@ sub verify_record_counts {
 }
 
 sub _do_check_unknown {
-    my ($self, $arg) = @_;
+    my ( $self, $arg ) = @_;
     my $classobj = $arg->{classobj};
     my $class    = $arg->{class};
     ###l4p $l4p ||= get_logger();
-    my $mtype = $classobj->mds.'_type';
-    my $sql   = " SELECT $mtype, count(*) "
-              . " FROM " . $classobj->mtable
-              . " GROUP BY $mtype";
+    my $mtype = $classobj->mds . '_type';
+    my $sql
+        = " SELECT $mtype, count(*) "
+        . " FROM "
+        . $classobj->mtable
+        . " GROUP BY $mtype";
     my $rows  = $arg->{dbh}->selectall_arrayref($sql);
     my $mcols = $classobj->metacolumns;
-    foreach my $row ( @$rows ) {
+    foreach my $row (@$rows) {
         my ( $type, $cnt ) = @$row;
         $arg->{counts}{$class}{total} += $cnt;
 
         unless ( grep { $_->{name} eq $type } @$mcols ) {
-            my $msg = "Found $cnt $class meta records of unknown type '$type'";
+            my $msg
+                = "Found $cnt $class meta records of unknown type '$type'";
             ###l4p $l4p->error( $msg ) unless $self->mode eq 'migrate';
             $arg->{counts}{$class}{bad_type} += $cnt;
-            push(@{ $arg->{badmeta}{$class}{type} }, $type );
+            push( @{ $arg->{badmeta}{$class}{type} }, $type );
         }
     }
 }
 
 sub _do_check_orphans {
-    my ($self, $arg) = @_;
-    my ($class, $mtable) = map { $arg->{$_} } qw( class mtable );
+    my ( $self, $arg ) = @_;
+    my ( $class, $mtable ) = map { $arg->{$_} } qw( class mtable );
     my $pk   = $class->properties->{primary_key};
-    my $mpk  = join('_', @{$arg}{'mds','ds'}, $pk);
+    my $mpk  = join( '_', @{$arg}{ 'mds', 'ds' }, $pk );
     my $sql  = "SELECT $mpk, count(*) FROM $mtable GROUP BY $mpk";
     my $rows = $arg->{dbh}->selectall_arrayref($sql);
 
-    foreach my $row ( @$rows ) {
+    foreach my $row (@$rows) {
         my ( $obj_id, $cnt ) = @$row;
-        unless ( $class->exist({ $pk => $obj_id }) ) {
+        unless ( $class->exist( { $pk => $obj_id } ) ) {
             my $msg = "Found $cnt $class meta records with non-existent "
-                    . "parent ID $obj_id";
+                . "parent ID $obj_id";
             ###l4p $l4p->error( $msg ) unless $self->mode eq 'migrate';
             $arg->{counts}{$class}{bad_parent} += $cnt;
-            push(@{ $arg->{badmeta}{$class}{parent} }, $obj_id );
+            push( @{ $arg->{badmeta}{$class}{parent} }, $obj_id );
         }
     }
 }
 
 sub _do_remove_orphans {
-    my ($self, $arg) = @_;
-    my $class        = $arg->{class};
-    my $mpkg         = $arg->{mpkg};
-    my $parent_ids   = $arg->{badmeta}{$class}{parent} || [];
+    my ( $self, $arg ) = @_;
+    my $class      = $arg->{class};
+    my $mpkg       = $arg->{mpkg};
+    my $parent_ids = $arg->{badmeta}{$class}{parent} || [];
     ###l4p $l4p ||= get_logger();
     return unless @$parent_ids;
 
-    my $msg = 'Are you sure you want to remove '.$arg->{mtable} .' rows with '
-            . 'non-existent parents? (This is destructive and '
-            . 'non-reversible!)';
-    return unless prompt('y', $msg, 'y/n', 'n');
+    my $msg
+        = 'Are you sure you want to remove '
+        . $arg->{mtable}
+        . ' rows with '
+        . 'non-existent parents? (This is destructive and '
+        . 'non-reversible!)';
+    return unless prompt( 'y', $msg, 'y/n', 'n' );
 
-    $self->progress("Removing orphaned metadata for $class... "
-        .p( $parent_ids ));
+    $self->progress(
+        "Removing orphaned metadata for $class... " . p($parent_ids) );
 
-    my $id  = $class->datasource . '_id';
+    my $id = $class->datasource . '_id';
     $self->_do_direct_remove( $arg, { $id => $parent_ids } );
 }
 
 sub _do_migrate_unknown {
-    my ($self, $arg) = @_;
-    state $rf        = MT->component('RetiredFields');
-    state $obsolete  = $rf->registry('obsolete_meta_fields');
-    state $unused    = $rf->registry('unused_meta_fields');
-    my $class        = $arg->{class};
-    my $mtable       = $arg->{mtable};
-    my $ds           = $arg->{ds};
-    my $mcols        = $arg->{classobj}->metacolumns;
-    my $olddb         = $arg->{mpkg}->driver;
+    my ( $self, $arg ) = @_;
+    state $rf       = MT->component('RetiredFields');
+    state $obsolete = $rf->registry('obsolete_meta_fields');
+    state $unused   = $rf->registry('unused_meta_fields');
+    my $class  = $arg->{class};
+    my $mtable = $arg->{mtable};
+    my $ds     = $arg->{ds};
+    my $mcols  = $arg->{classobj}->metacolumns;
+    my $olddb  = $arg->{mpkg}->driver;
     ###l4p $l4p ||= get_logger();
 
     my @unknown = map { @{ $_->{$ds} || [] } } $unused, $obsolete;
@@ -697,24 +717,22 @@ sub _do_migrate_unknown {
     my $newdb = $arg->{mpkg}->driver;
 
     $self->cfgmgr->use_old_database;
-    foreach my $unknown ( @unknown ) {
+    foreach my $unknown (@unknown) {
         next if grep { $unknown eq $_->{name} } @$mcols;
-        my( $select, @sbind ) = $sql->select(
-            $mtable,
-            ['*'],
-            { $arg->{mds}.'_type' => $unknown }
-        );
+        my ( $select, @sbind )
+            = $sql->select( $mtable, ['*'],
+            { $arg->{mds} . '_type' => $unknown } );
         ###l4p $l4p->debug( $select.' '.p(@sbind) );
 
-        my ($insert, $isth);
+        my ( $insert, $isth );
         my $ssth = $olddb->rw_handle->prepare($select);
         $ssth->execute(@sbind);
         while ( my $d = $ssth->fetchrow_hashref ) {
-            $insert ||= $sql->insert($mtable, $d);
-            $isth   ||= $newdb->rw_handle->prepare($insert);
+            $insert ||= $sql->insert( $mtable, $d );
+            $isth ||= $newdb->rw_handle->prepare($insert);
             ###l4p $l4p->debug( $insert.' '.p($sql->values($d)));
-            try { $isth->execute($sql->values($d)); }
-            catch { $l4p->warn('Insert error: '.$_) };
+            try { $isth->execute( $sql->values($d) ); }
+            catch { $l4p->warn( 'Insert error: ' . $_ ) };
         }
     }
 
@@ -722,23 +740,25 @@ sub _do_migrate_unknown {
 }
 
 sub _do_remove_obsolete {
-    my ($self, $arg) = @_;
-    state $rf        = MT->component('RetiredFields');
-    state $obsolete  = $rf->registry('obsolete_meta_fields');
-    state $unused    = $rf->registry('unused_meta_fields');
-    my $class  = $arg->{class};
-    my $mtable = $arg->{mtable};
-    my $meta_types = $obsolete->{$arg->{ds}};
+    my ( $self, $arg ) = @_;
+    state $rf       = MT->component('RetiredFields');
+    state $obsolete = $rf->registry('obsolete_meta_fields');
+    state $unused   = $rf->registry('unused_meta_fields');
+    my $class      = $arg->{class};
+    my $mtable     = $arg->{mtable};
+    my $meta_types = $obsolete->{ $arg->{ds} };
     ###l4p $l4p ||= get_logger();
 
-    return unless @{ $arg->{badmeta}{$class}{type} }
-               && try { @{$arg->{meta_types}} };
+    return
+        unless @{ $arg->{badmeta}{$class}{type} }
+        && try { @{ $arg->{meta_types} } };
 
-    my $msg = "Are you sure you want to remove $mtable rows with the fields "
-            . "above which RetiredFields says are obsolete? (This is "
-            . "destructive and non-reversible!)";
+    my $msg
+        = "Are you sure you want to remove $mtable rows with the fields "
+        . "above which RetiredFields says are obsolete? (This is "
+        . "destructive and non-reversible!)";
     p($meta_types);
-    return unless prompt('y', $msg, 'y/n', 'n');
+    return unless prompt( 'y', $msg, 'y/n', 'n' );
 
     my $is_unknown = sub {
         my $v = shift;
@@ -750,14 +770,14 @@ sub _do_remove_obsolete {
 
     if ( $obsoletes && @$obsoletes ) {
         $self->progress("Removing obsolete metadata fields for $class...");
-        p( $obsoletes );
+        p($obsoletes);
         $self->_do_direct_remove( $arg, { type => $obsoletes } );
     }
 
     if ( $unhandled && @$unhandled ) {
-        $self->progress('Not removing the following fields which '
-              . 'were not specified by the RetiredFields plugin: '
-              . (join(', ', @$unhandled)));
+        $self->progress( 'Not removing the following fields which '
+                . 'were not specified by the RetiredFields plugin: '
+                . ( join( ', ', @$unhandled ) ) );
     }
 }
 
@@ -765,19 +785,19 @@ sub _do_direct_remove {
     my ( $self, $arg, $terms ) = @_;
     my $mpkg = $arg->{mpkg};
     ###l4p $l4p ||= get_logger();
-    try   { $mpkg->driver->direct_remove( $mpkg, $terms ) }
+    try { $mpkg->driver->direct_remove( $mpkg, $terms ) }
     catch { $l4p->error($_); exit };
 }
 
 sub _create_check_meta_args {
     my ( $self, $arg ) = @_;
-    my $classobj       = $arg->{classobj};
-    $arg->{$_}         = $classobj->$_ for qw( class mpkg ds mds table mtable );
-    $arg->{dbh}        = $arg->{mpkg}->driver->rw_handle;
+    my $classobj = $arg->{classobj};
+    $arg->{$_} = $classobj->$_ for qw( class mpkg ds mds table mtable );
+    $arg->{dbh} = $arg->{mpkg}->driver->rw_handle;
 
     my $class = $arg->{class};
     $arg->{badmeta}{$class}{$_} = [] foreach qw( type parent );
-    $arg->{counts}{$class}{$_}  = 0 foreach qw( total bad_type bad_parent );
+    $arg->{counts}{$class}{$_}  = 0  foreach qw( total bad_type bad_parent );
     return $arg;
 }
 
@@ -798,7 +818,8 @@ sub progress {
 our $README = '';
 
 around parse_options => sub {
-    my ( $orig, $class, %params) = (shift, shift, @_);
+    my ( $orig, $class, %params ) = ( shift, shift, @_ );
+
     # warn "In parse_options";
     if ( grep { '--readme' eq $_ } @ARGV ) {
         push( @ARGV, '--man' );
@@ -811,6 +832,7 @@ around parse_options => sub {
 
 around options_man => sub {
     my ( $orig, $class, $usage, $output ) = @_;
+
     # p(@_);
     local @ARGV = ();
     if ( !$usage ) {
@@ -820,11 +842,12 @@ around options_man => sub {
     }
 
     $Pod::POM::DEFAULT_VIEW = 'Pod::POM::View::Pod';
-    my ($printing, @extra_pod) = ( 0, () );
+    my ( $printing, @extra_pod ) = ( 0, () );
     for my $node ( $pom->content ) {
-        unless ( $printing ) {
-            next unless $node->type() eq 'head1'
-                    and $node->title eq 'MODES';
+        unless ($printing) {
+            next
+                unless $node->type() eq 'head1'
+                and $node->title eq 'MODES';
             $printing = 1;
         }
         push( @extra_pod, $node->present('Pod::POM::View::Pod') );
@@ -834,16 +857,16 @@ around options_man => sub {
     my $man_file = file( Path::Class::tempdir( CLEANUP => 1 ), 'help.pod' );
     $man_file->spew(
         iomode => '>:encoding(UTF-8)',
-        join("\n\n", $usage->option_pod, @extra_pod)
+        join( "\n\n", $usage->option_pod, @extra_pod )
     );
 
     if ( $README eq 'txt' ) {
         require Pod::Text;
-        Pod::Text->filter( $man_file->stringify )
+        Pod::Text->filter( $man_file->stringify );
     }
     elsif ( $README eq 'md' ) {
         require Pod::Markdown;
-        Pod::Markdown->filter( $man_file->stringify )
+        Pod::Markdown->filter( $man_file->stringify );
     }
     elsif ( $README eq 'gh' ) {
         require Pod::Markdown::Github;
@@ -1028,3 +1051,66 @@ Due to a silly little quirk in Movable Type, the utility must be installed as
 Jay Allen, Endevver LLC <jay@endevver.com>
 
 =cut
+
+
+sub do_full_migrate_verify {
+    my $self       = shift;
+    # my $cfgmgr     = $self->cfgmgr;
+    # my $classmgr   = $self->classmgr;
+    # my $class_objs = $self->class_objects;
+    ###l4p $l4p ||= get_logger();
+
+    # ref($self)->new_with_options(
+    #     mode       => 'resavesource',
+    #     skip_table => 'log',
+    # )->run();
+
+    # my $skip_tables = [
+    #     keys %{ map { $_ => 1 } ( 'log', @{$self->skip_tables} ) }
+    # ];
+    # $self->skip_tables($skip_tables);
+    # $self->mode('migrate');
+    # $self->run
+    #
+    # ref($self)->new_with_options(
+    #     mode       => 'migrate',
+    #     skip_table => 'log',
+    # )->run();
+
+    # =pod
+    #     cd $MT_HOME
+    #     CONVERTDB="plugins/ConvertDB/tools/convertdb --new mt-config-NEW.cgi"
+    #
+    #     # Need help??
+    #     $CONVERTDB --usage                              # Show compact usage syntax
+    #     $CONVERTDB --help                               # Show help text
+    #     $CONVERTDB --man                                # Show man page
+    #
+    #     # Migration modes
+    #     $CONVERTDB --mode resavesource                  # Prep source DB
+    #     $CONVERTDB --mode migrate                       # Migrate and verify
+    #
+    #     # Inspection/verification modes
+    #     $CONVERTDB --mode verify                        # Reverify data
+    #     $CONVERTDB --mode showcounts                    # Compare table counts
+    #     $CONVERTDB --mode checkmeta                     # Check for orphaned/unregistered
+    #
+    #     # Metadata cleanup
+    #     $CONVERTDB --mode checkmeta --remove-orphans    # Remove the orphaned
+    #     $CONVERTDB --mode checkmeta --migrate-unknown   # Migrate the unregistered
+    #
+    #     die;
+    #     __PACKAGE__->new_with_options('mode' => 'resave-source')->run;
+    #
+    #     my $chkmeta = __PACKAGE__->new_with_options(
+    #         'mode' => 'check-meta',
+    #         'remove_orphans' => 1,
+    #         'migrate_unknown' => 1
+    #     )->run;
+    #
+    #     my $migrate = __PACKAGE__->new_with_options(
+    #         'mode' => 'migrate',
+    #     )->run;
+    # =cut
+}
+
