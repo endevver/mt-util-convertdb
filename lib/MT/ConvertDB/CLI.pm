@@ -173,9 +173,9 @@ the process or plan on verifying later.),
 );
 
 option migrate_unknown => (
-    is       => 'ro',
+    is       => 'rw',
     doc      => '[WITH MODE: checkmeta] Migrate all unknown metadata.',
-    long_doc => q([B<checkmeta MODE ONLY>] This option cause all metadata records with unregistered field types to be migrated.  This normally doesn't happen under B<migrate> mode which only transfers object metadata with registered field types.'),
+    long_doc => q([B<checkmeta MODE ONLY>] This option cause all metadata records with unregistered field types to be migrated.  This step now occurs during migrate mode so there should be no need to run it separately.'),
     default  => 0,
     order    => 40,
 );
@@ -383,10 +383,10 @@ sub do_table_counts {
 }
 
 sub do_check_meta {
-    my $self       = shift;
+    my ($self, $class_objs) = @_;
     my $cfgmgr     = $self->cfgmgr;
     my $classmgr   = $self->classmgr;
-    my $class_objs = $self->class_objects;
+    $class_objs  ||= $self->class_objects;
     ###l4p $l4p ||= get_logger();
     require MT::Meta;
 
@@ -408,10 +408,11 @@ sub do_check_meta {
             counts   => \%counts,
             badmeta  => \%badmeta,
         });
-        $arg->{dbh}{RaiseError}       = 1;
-        $arg->{dbh}{FetchHashKeyName} = 'NAME_lc'; # lc($colnames)
+        local $arg->{dbh}{RaiseError}       = 1;
+        local $arg->{dbh}{FetchHashKeyName} = 'NAME_lc'; # lc($colnames)
 
-        $self->progress("Checking $class metadata...");
+        $self->progress("Checking $class metadata...")
+            unless $self->mode eq 'migrate';
 
         try {
             $self->_do_check_unknown($arg);
@@ -429,16 +430,25 @@ sub do_check_meta {
             $self->_do_remove_unused($arg)   if $self->remove_unused;
         }
     }
-    p(%counts);
 
-    say "Orphaned metadata fields:";
+    if ( %counts and $self->mode ne 'migrate' ) {
+        ###l4p $l4p->info("Bad metadata check: ", l4mtdump(\%counts));
+        p(%counts);
+    }
+
     delete $badmeta{$_}{type}
         for grep { ! @{$badmeta{$_}{type}} } keys %badmeta;
     delete $badmeta{$_}{parent}
         for grep { ! @{$badmeta{$_}{parent}} } keys %badmeta;
     delete $badmeta{$_}
         for grep { ! %{ $badmeta{$_} } } keys %badmeta;
-    p(%badmeta);
+
+    if ( %badmeta and $self->mode ne 'migrate' ) {
+        my $label = 'Orphaned metadata fields:';
+        say $label;
+        p(%badmeta);
+        $l4p->info( $label, l4mtdump(\%badmeta) );
+    }
 }
 
 sub do_test {
@@ -503,6 +513,7 @@ sub do_migrate_verify {
 
     if ( $self->mode eq 'migrate' ) {
         ###l4p $l4p->info( "Truncating all tables in destination database" );
+        $self->migrate_unknown(1);
         $cfgmgr->newdb->remove_all($_) foreach @$class_objs;
         $self->do_table_counts();
     }
@@ -537,6 +548,8 @@ sub do_migrate_verify {
 
             $cfgmgr->use_old_database();
         }
+
+        $self->do_check_meta([$classobj]);
 
         $cfgmgr->post_migrate_class($classobj) unless $self->dry_run;
     }
@@ -606,8 +619,8 @@ sub _do_check_unknown {
         $arg->{counts}{$class}{total} += $cnt;
 
         unless ( grep { $_->{name} eq $type } @$mcols ) {
-            ###l4p $l4p->error( "Found $cnt $class meta records "
-            ###l4p            . "of unknown type '$type'" );
+            my $msg = "Found $cnt $class meta records of unknown type '$type'";
+            ###l4p $l4p->error( $msg ) unless $self->mode eq 'migrate';
             $arg->{counts}{$class}{bad_type} += $cnt;
             push(@{ $arg->{badmeta}{$class}{type} }, $type );
         }
@@ -625,8 +638,9 @@ sub _do_check_orphans {
     foreach my $row ( @$rows ) {
         my ( $obj_id, $cnt ) = @$row;
         unless ( $class->exist({ $pk => $obj_id }) ) {
-            ###l4p $l4p->error( "Found $cnt $class meta records "
-            ###l4p    . "with non-existent parent ID $obj_id" );
+            my $msg = "Found $cnt $class meta records with non-existent "
+                    . "parent ID $obj_id";
+            ###l4p $l4p->error( $msg ) unless $self->mode eq 'migrate';
             $arg->{counts}{$class}{bad_parent} += $cnt;
             push(@{ $arg->{badmeta}{$class}{parent} }, $obj_id );
         }
@@ -666,6 +680,9 @@ sub _do_migrate_unknown {
     ###l4p $l4p ||= get_logger();
 
     my @unknown = map { @{ $_->{$ds} || [] } } $unused, $obsolete;
+    return unless @unknown;
+
+    $self->progress("Migrating unregistered $class metadata");
     ###l4p $l4p->debug('Migrating unregistered meta fields: ', l4mtdump(@unknown));
 
     require SQL::Abstract;
@@ -692,7 +709,7 @@ sub _do_migrate_unknown {
         while ( my $d = $ssth->fetchrow_hashref ) {
             $insert ||= $sql->insert($mtable, $d);
             $isth   ||= $newdb->rw_handle->prepare($insert);
-            ###l4p $l4p->info( $insert.' '.p($sql->values($d)));
+            ###l4p $l4p->debug( $insert.' '.p($sql->values($d)));
             try { $isth->execute($sql->values($d)); }
             catch { $l4p->warn('Insert error: '.$_) };
         }
