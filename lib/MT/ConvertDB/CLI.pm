@@ -7,6 +7,7 @@ use List::MoreUtils qw( none part );
 use Term::Prompt qw( prompt );
 use Sub::Quote qw( quote_sub );
 use Pod::Usage qw( pod2usage );
+use Text::Table;
 
 use Pod::POM;
 my ( @POD_EXTRACT, %MooXOptions, $parser, $pom );
@@ -371,7 +372,6 @@ sub do_table_counts {
     $self->clear_table_counts();
     my $cnt = $self->table_counts;
 
-    use Text::Table;
     my $tb = Text::Table->new(
         "Table",   "Status",  "Old",      "New",
         "Obj-Old", "Obj-New", "Meta-Old", "Meta-New"
