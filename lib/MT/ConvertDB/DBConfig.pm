@@ -332,10 +332,11 @@ sub remove_all {
     my $classobj = shift;
     my $class    = $classobj->class;
     ###l4p $l4p ||= get_logger();
-    return if $self->read_only;
-
-    $self->clear_counts($classobj);
-    return $classobj->remove_all();
+    unless ( $self->read_only ) {
+        $self->clear_counts($classobj);
+        return $classobj->remove_all();
+    }
+    confess "remove_all attempted on read-only database ".$self->label;
 }
 
 sub save {
@@ -344,6 +345,8 @@ sub save {
     ###l4p $l4p ||= get_logger();
 
     return $classobj->save($obj) unless $self->read_only;
+
+    confess "Save attempted on read-only database ".$self->label;
 
     ###l4p $l4p->debug(sprintf('FAKE saving %s%s',
     ###l4p     $classobj->class,
