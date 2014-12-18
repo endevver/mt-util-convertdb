@@ -73,8 +73,8 @@ sub _trigger_read_only {
     my $self = shift;
     my $val  = shift;
     ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->info(sprintf('Driver for %s is %s', $self->file->basename,
-    ###l4p     $val ? 'READ ONLY' : 'WRITEABLE' ));
+        ###l4p $l4p->info(sprintf('Driver dbh for %s set to %s', $self->label,
+        ###l4p     $val ? 'READ ONLY' : 'WRITEABLE' ));
 }
 
 sub _build_app {
@@ -227,8 +227,7 @@ sub check_plugins {
 sub check_schema {
     my $self = shift;
     ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->info(sprintf('Checking schema [%s %s %s]',
-    ###l4p     $self->file->basename, $self->driver->{dsn},
+    ###l4p $l4p->info(sprintf('Checking schema for %s', $self->label,
     ###l4p     $self->needs_install ? 'NEEDS INSTALL' : ''));
 
     $self->reset_object_drivers();
@@ -335,13 +334,11 @@ sub save {
 }
 
 sub label {
-    my $self = shift;
-    join( ' ',
-        '[',
-        ( $self->has_file   ? $self->file->basename : () ),
-        ( $self->has_driver ? $self->driver->{dsn}  : () ),
-        ( $self->read_only  ? 'READ ONLY'           : 'WRITEABLE' ),
-        ']' );
+    my $self     = shift;
+    my $file     = $self->has_file ? $self->file->basename : '';
+    my $readonly = $self->read_only ? 'READ ONLY' : 'WRITEABLE';
+    my $dsn      = $self->has_driver ? $self->driver->{dsn} : $self->app->config->Database;
+    return "[${file}:${dsn} $readonly]";
 }
 
 1;
