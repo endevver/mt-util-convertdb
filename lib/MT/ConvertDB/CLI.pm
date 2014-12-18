@@ -175,7 +175,9 @@ the process or plan on verifying later.),
 option migrate_unknown => (
     is       => 'rw',
     doc      => '[WITH MODE: checkmeta] Migrate all unknown metadata.',
-    long_doc => q([B<checkmeta MODE ONLY>] This option cause all metadata records with unregistered field types to be migrated.  This step now occurs during migrate mode so there should be no need to run it separately.'),
+    long_doc => q([B<checkmeta MODE ONLY>] This option cause all metadata records with
+unregistered field types to be migrated. This step now occurs during migrate
+mode so there should be no need to run it separately.'),
     default  => 0,
     order    => 40,
 );
@@ -869,9 +871,10 @@ convertdb
 
 =head1 DESCRIPTION
 
-This utility makes it possible to migrate Movable Type data between databases, regardless of
-database type. For example, you could use it to backup your MT data from one MySQL database to
-another or you could migrate your data to a completely different database (e.g. Oracle to MySQL).
+This utility makes it possible to migrate Movable Type data between databases,
+regardless of database type. For example, you could use it to backup your MT
+data from one MySQL database to another or you could migrate your data to a
+completely different database (e.g. Oracle to MySQL).
 
 =head1 SYNOPSIS
 
@@ -956,7 +959,8 @@ migrate --no-verify>.
 
 =item * B<show_counts>
 
-Shows the object and metadata table counts for the specified class(es) in both the current and new databaseq.
+Shows the object and metadata table counts for the specified class(es) in both
+the current and new database.
 
 =back
 

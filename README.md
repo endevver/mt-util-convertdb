@@ -4,9 +4,10 @@ mt-util-convertdb
 
 # DESCRIPTION
 
-This utility makes it possible to migrate Movable Type data between databases, regardless of
-database type. For example, you could use it to backup your MT data from one MySQL database to
-another or you could migrate your data to a completely different database (e.g. Oracle to MySQL).
+This utility makes it possible to migrate Movable Type data between databases,
+regardless of database type. For example, you could use it to backup your MT
+data from one MySQL database to another or you could migrate your data to a
+completely different database (e.g. Oracle to MySQL).
 
 # SYNOPSIS
 
@@ -125,7 +126,9 @@ convertdb \[-h\] \[long options ...\]
 
 - **--migrate\_unknown:**
 
-    \[**checkmeta MODE ONLY**\] This option cause all metadata records with unregistered field types to be migrated.  This normally doesn't happen under **migrate** mode which only transfers object metadata with registered field types.'
+    \[**checkmeta MODE ONLY**\] This option cause all metadata records with
+    unregistered field types to be migrated. This step now occurs during migrate
+    mode so there should be no need to run it separately.'
 
 - **--remove\_orphans:**
 
@@ -201,7 +204,8 @@ The following is a list of all supported values for the `--mode` flag:
 
 - **show\_counts**
 
-    Shows the object and metadata table counts for the specified class(es) in both the current and new databaseq.
+    Shows the object and metadata table counts for the specified class(es) in both
+    the current and new database.
 
 # INSTALLATION
 
