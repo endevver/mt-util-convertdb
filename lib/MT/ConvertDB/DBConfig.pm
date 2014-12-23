@@ -171,6 +171,7 @@ sub _build_driver {
 
     if ( $self->read_only ) {
         $driver->rw_handle->{ReadOnly} = 1;
+        $driver->r_handle->{ReadOnly}  = 1;
         ###l4p $l4p->info(sprintf('Driver dbh for %s set to %s', $self->label,
         ###l4p     'READ ONLY' ));
     }
