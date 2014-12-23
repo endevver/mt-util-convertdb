@@ -275,7 +275,7 @@ sub reset_object_drivers {
     require MT::ObjectDriverFactory;
     no warnings 'once';
     $MT::ObjectDriverFactory::DRIVER = $MT::Object::DRIVER = $driver;
-    $MT::ObjectDriverFactory::dbd_class = $driver ? $driver->dbd : undef;
+    $MT::ObjectDriverFactory::dbd_class = undef;
 }
 
 sub use {
