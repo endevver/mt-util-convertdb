@@ -491,6 +491,7 @@ sub do_resave_source {
 
     foreach my $classobj (@$class_objs) {
         my $class = $classobj->class;
+        next unless MT::Meta->has_own_metadata_of($class);
 
         # Reset object drivers for class and metaclass
         undef $class->properties->{driver};
