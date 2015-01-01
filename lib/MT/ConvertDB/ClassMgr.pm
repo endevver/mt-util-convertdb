@@ -193,15 +193,22 @@ package MT::ConvertDB::Role::SimpleSave {
 
 package MT::ConvertDB::Role::DefaultSave {
     use Moo::Role;
-
+    use Try::Tiny;
     sub save_method {
         return sub {
             my ( $self, $obj ) = @_;
+
+            # Die noisily if classed object is being saved via wrong class
+            if ( $self->is_classed_class ) {
+                $self->verify_class($obj) or return;
+            }
+
             my $save = MT::Object->can('save');
             $obj->$save;
-            }
+        };
     }
 }
+
 
 package MT::ConvertDB::ClassMgr::Generic {
     use MT::ConvertDB::ToolSet;
@@ -231,11 +238,29 @@ package MT::ConvertDB::ClassMgr::Generic {
         isa => quote_sub(q( defined($_[0]) or die "table not defined" )),
     );
 
-    has mpkg => ( is => 'lazy', );
+    has [qw( mpkg mds mtable class_type is_classed_class )] => ( is => 'lazy' );
 
-    has mds => ( is => 'lazy', );
+    sub _build_class_type {
+        my $self = shift;
+        exists $self->class->properties->{class_type}
+            ? $self->class->properties->{class_type} : ''
+    }
 
-    has mtable => ( is => 'lazy', );
+    sub _build_is_classed_class { shift->class_type ? 1 : 0 }
+
+    sub verify_class {
+        my ( $self, $obj ) = @_;
+        my $ctype = $self->class_type or return 1;
+        my $otype = $obj->class_type || '';
+        # ###l4p $l4p ||= get_logger();
+        # $l4p->info("ctype/otype: $ctype/$otype ". $obj->id);
+        return 1 if $ctype eq $otype;
+
+        return $obj->error(sprintf(
+            'Wrong object class for %s ID %d %s',
+            $otype, $obj->id, Carp::longmess()
+        ));
+    }
 
     sub _build_ds { shift->class->datasource }
 
