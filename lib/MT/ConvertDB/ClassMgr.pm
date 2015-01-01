@@ -193,7 +193,6 @@ package MT::ConvertDB::Role::SimpleSave {
 
 package MT::ConvertDB::Role::DefaultSave {
     use Moo::Role;
-    use Try::Tiny;
     sub save_method {
         return sub {
             my ( $self, $obj ) = @_;
