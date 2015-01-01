@@ -1005,7 +1005,17 @@ Due to a silly little quirk in Movable Type, the utility must be installed as
 
 =item * Movable Type 5 or higher
 
-=item * Log4MT plugin
+=over 4
+
+=item * Log4MT plugin (use perl5.8.9-compat branch)
+
+=item * RetiredFields plugin
+
+=back
+
+=item * CPAN Modules
+
+=over 4
 
 =item * Class::Load
 
@@ -1046,6 +1056,8 @@ Due to a silly little quirk in Movable Type, the utility must be installed as
 =item * SQL::Abstract
 
 =item * Path::Class
+
+=back
 
 =head1 AUTHOR
 

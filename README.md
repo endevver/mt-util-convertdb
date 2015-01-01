@@ -221,27 +221,29 @@ Due to a silly little quirk in Movable Type, the utility must be installed as
 ## DEPENDENCIES
 
 - Movable Type 5 or higher
-- Log4MT plugin
-- Class::Load
-- Data::Printer
-- Import::Base
-- List::MoreUtils
-- List::Util
-- Module::Runtime
-- Moo
-- MooX::Options
-- Path::Tiny
-- Scalar::Util
-- Sub::Quote
-- Term::ProgressBar
-- Test::Deep
-- Text::Table
-- ToolSet
-- Try::Tiny
-- Term::Prompt
-- Pod::POM
-- SQL::Abstract
-- Path::Class
+    - Log4MT plugin (use perl5.8.9-compat branch)
+    - RetiredFields plugin
+- CPAN Modules
+    - Class::Load
+    - Data::Printer
+    - Import::Base
+    - List::MoreUtils
+    - List::Util
+    - Module::Runtime
+    - Moo
+    - MooX::Options
+    - Path::Tiny
+    - Scalar::Util
+    - Sub::Quote
+    - Term::ProgressBar
+    - Test::Deep
+    - Text::Table
+    - ToolSet
+    - Try::Tiny
+    - Term::Prompt
+    - Pod::POM
+    - SQL::Abstract
+    - Path::Class
 
 # AUTHOR
 
