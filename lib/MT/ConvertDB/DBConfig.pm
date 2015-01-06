@@ -252,6 +252,8 @@ sub check_schema {
     ###l4p $l4p->info(sprintf('Checking schema for %s', $self->label,
     ###l4p     $self->needs_install ? 'NEEDS INSTALL' : ''));
 
+    return unless $self->needs_install;
+
     $self->reset_object_drivers();
 
     my $dbh = $self->driver->rw_handle;
