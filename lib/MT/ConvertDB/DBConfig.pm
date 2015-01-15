@@ -258,7 +258,7 @@ sub check_schema {
 
     my $dbh = $self->driver->rw_handle;
     local $dbh->{RaiseError} = 0;  # Upgrade doesn't handle its own exceptions
-    local $SIG{__WARN__} = sub { $l4p->warn(@_) };    # Re-route warnings
+    local $SIG{__WARN__} = sub { }; # Quiet warnings
 
     require MT::Upgrade;
     MT::Upgrade->do_upgrade( CLI => 1, Install => $self->needs_install )
