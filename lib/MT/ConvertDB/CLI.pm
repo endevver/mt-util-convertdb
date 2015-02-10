@@ -731,9 +731,14 @@ sub _do_migrate_unknown {
         while ( my $d = $ssth->fetchrow_hashref ) {
             $insert ||= $sql->insert( $mtable, $d );
             $isth ||= $newdb->rw_handle->prepare($insert);
-            ###l4p $l4p->debug( $insert.' '.p($sql->values($d)));
-            try { $isth->execute( $sql->values($d) ); }
-            catch { $l4p->warn( 'Insert error: ' . $_ ) };
+            try {
+                $isth->execute( $sql->values($d) );
+                ###l4p $l4p->debug( $insert.' '.p($sql->values($d)));
+            }
+            catch {
+                $l4p->warn( "Insert error: $_" );
+                $l4p->warn( $insert.' '.p($sql->values($d)));
+            };
         }
     }
 
