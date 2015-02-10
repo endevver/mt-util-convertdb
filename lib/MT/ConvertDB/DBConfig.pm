@@ -1,6 +1,7 @@
 package MT::ConvertDB::DBConfig;
 
 use MT::ConvertDB::ToolSet;
+use Scalar::Util qw( refaddr );
 use vars qw( $l4p );
 
 has read_only => (
@@ -178,7 +179,10 @@ sub _build_driver {
 
     ###l4p $l4p->info('Objectdriver configured: '.$driver->{dsn});
     no warnings 'once';
-    push( @MT::ObjectDriverFactory::drivers, $driver );
+    push( @MT::ObjectDriverFactory::drivers, $driver )
+        unless grep { $_->{dsn} eq $driver->{dsn} }
+                    @MT::ObjectDriverFactory::drivers;
+    ###l4p $l4p->debug('ObjectDrivers: ', l4mtdump(\@MT::ObjectDriverFactory::drivers));
     return ( $MT::Object::DRIVER = $MT::ObjectDriverFactory::DRIVER
             = $driver );
 }
