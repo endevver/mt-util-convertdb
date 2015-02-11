@@ -8,6 +8,7 @@ use Term::Prompt qw( prompt );
 use Sub::Quote qw( quote_sub );
 use Pod::Usage qw( pod2usage );
 use Text::Table;
+use Text::FindIndent;
 
 use Pod::POM;
 my ( @POD_EXTRACT, %MooXOptions, $parser, $pom );
@@ -42,38 +43,53 @@ has mode_handlers => (
 );
 
 option mode => (
-    is     => 'rw',
-    format => 's',
-    doc =>
-        '[REQUIRED] Run mode: show_counts, resave_source, check_meta, migrate or verify.',
-    long_doc =>
-        q([REQUIRED] Run modes. See the L</MODES> section for the list of valid values.),
+    is       => 'rw',
+    format   => 's',
     coerce   => quote_sub(q( ($_[0] = lc($_[0])) =~ s/[^a-z]//g; $_[0]  )),
     default  => 'initonly',
     required => 1,
     order    => 1,
+    doc(q(
+        [REQUIRED] Run mode: show_counts, resave_source, check_meta, migrate
+        or verify.
+    )),
+    long_doc(q(
+        [REQUIRED] Run modes. See the L</MODES> section for the list of
+        valid values.
+    )),
 );
 
 option new_config => (
     is       => 'ro',
     format   => 's',
     required => 1,
-    doc =>
-        '[REQUIRED] Path to config file for new database. Can be relative to MT_HOME',
-    long_doc =>
-        q([REQUIRED] Use this option to specify the path/filename of the MT config file containing the new database information.  It can be an absolute path or relative to MT_HOME (e.g. ./mt-config-new.cgi)),
-    order => 5,
+    order    => 5,
+    doc(q(
+        [REQUIRED] Path to config file for new database. Can be relative to
+        MT_HOME
+    )),
+    long_doc(q(
+        [REQUIRED] Use this option to specify the path/filename of the MT
+        config file containing the new database information. It can be an
+        absolute path or relative to MT_HOME (e.g. ./mt-config-new.cgi)
+    )),
 );
 
 option old_config => (
-    is     => 'ro',
-    format => 's',
-    doc =>
-        'Path to current config file. Can be relative to MT_HOME. Defaults to ./mt-config.cgi',
-    long_doc =>
-        q(Use this to specify the path/filename of the current MT config file.  It defaults to ./mt-config-cgi so you only need to use it if you want to set specific configuration directives which are different than the ones in use in the MT installation.),
-    default => './mt-config.cgi',
-    order   => 10,
+    is       => 'ro',
+    format   => 's',
+    default  => './mt-config.cgi',
+    order    => 10,
+    doc(q(
+        Path to current config file. Can be relative to MT_HOME. Defaults
+        to ./mt-config.cgi'
+    )),
+    long_doc(q(
+        Use this to specify the path/filename of the current MT config file. It
+        defaults to ./mt-config-cgi so you only need to use it if you want to
+        set specific configuration directives which are different than the ones
+        in use in the MT installation.
+    )),
 );
 
 option classes => (
@@ -81,19 +97,23 @@ option classes => (
     format    => 's@',
     autosplit => ',',
     default   => sub { [] },
-    doc =>
-        'Classes to include (e.g. MT::Blog). Can be comma-delimited or specified multiple times',
-    long_doc =>
-        q((B<Note:> You should I<PROBABLY> be using the C<--tables> option instead.) Use this to specify one or
-more classes you want to act on in the specified mode. This is useful if you want to execute a particular
-mode on a one or a few classes of objects. For example:
+    order     => 25,
+    doc(q(
+        Classes to include (e.g. MT::Blog). Can be comma-delimited
+        or specified multiple times
+    )),
+    long_doc(q(
+        (B<Note:> You should I<PROBABLY> be using the C<--tables> option
+        instead.) Use this to specify one or more classes you want to act on in
+        the specified mode. This is useful if you want to execute a particular
+        mode on a one or a few classes of objects. For example:
 
-    --mode migrate --class MT::Template
-    --mode showcounts --classes MT::Author,MT::Template
+            --mode migrate --class MT::Template
+            --mode showcounts --classes MT::Author,MT::Template
 
-See the C<--tables> option for information on this options multiple-value syntax and parent class
-inclusion.),
-    order => 25,
+        See the C<--tables> option for information on this options
+        multiple-value syntax and parent class inclusion.
+    )),
 );
 
 option skip_classes => (
@@ -101,15 +121,20 @@ option skip_classes => (
     format    => 's@',
     autosplit => ',',
     default   => sub { [] },
-    doc =>
-        'Classes to skip (e.g. MT::Log). Can be comma-delimited or specified multiple times',
-    long_doc =>
-        q((B<Note:> You should I<PROBABLY> be using the C<--skip-tables> option instead.) Use this to specify one
-or more classes to exclude during execution of the specified mode. It is the exact inverse of the
-C<--classes> option and similar to the C<--skip-tables> option.
+    order     => 30,
+    doc(q(
+        Classes to skip (e.g. MT::Log). Can be comma-delimited or specified
+        multiple times
+    )),
+    long_doc(q(
+        (B<Note:> You should I<PROBABLY> be using the C<--skip-tables> option
+        instead.) Use this to specify one or more classes to exclude during
+        execution of the specified mode. It is the exact inverse of the
+        C<--classes> option and similar to the C<--skip-tables> option.
 
-This option is ignored if either C<--tables> or C<--classes> options are specified.),
-    order => 30,
+        This option is ignored if either C<--tables> or C<--classes> options
+        are specified.
+    )),
 );
 
 option tables => (
@@ -117,38 +142,47 @@ option tables => (
     format    => 's@',
     autosplit => ',',
     default   => sub { [] },
-    doc =>
-        'Tables to process (omit "mt_" prefix: log). Can be comma-delimited or specified multiple times',
-    long_doc =>
-        q(Use this to specify one or more tables (omitting the C<mt_> prefix) to include during execution of the
-specified mode. It works similarly to C<--classes> but often shorter and more likely what you want since
-it removes the ambiguity of classed objects (MT::Blog/MT::Website, MT::Entry/MT::Page).
+    order     => 15,
+    doc(q(
+        Tables to process (omit "mt_" prefix: log). Can be
+        comma-delimited or specified multiple times
+    )),
+    long_doc(q(
+        Use this to specify one or more tables (omitting the C<mt_>
+        prefix) to include during execution of the specified mode. It works
+        similarly to C<--classes> but often shorter and more likely what you
+        want since it removes the ambiguity of classed objects
+        (MT::Blog/MT::Website, MT::Entry/MT::Page).
 
-For example, the following performs migration of ALL objects in the mt_blog table (which may include
-MT::Blog, MT::Website and MT::Community::Blog objects):
+        For example, the following performs migration of ALL objects in the
+        mt_blog table (which may include MT::Blog, MT::Website and
+        MT::Community::Blog objects):
 
-    convertdb --mode migrate --table blog
+            convertdb --mode migrate --table blog
 
-Like the C<--classes>, C<--skip-classes> and C<--skip-tables> options, multiple values can be specified
-either as a comma-delimited list or separate options and the option name can be singularized for
-readability. For example, the following are equivalent:
+        Like the C<--classes>, C<--skip-classes> and C<--skip-tables> options,
+        multiple values can be specified either as a comma-delimited list or
+        separate options and the option name can be singularized for
+        readability. For example, the following are equivalent:
 
-        --table blog --table author --table entry
-        --tables blog,author,entry
+            --table blog --table author --table entry
+            --tables blog,author,entry
 
-Also note, like the C<--classes> option, any tables contain objects whose class is a parent of the class
-of objects in your specified tables will also be included. For example, the following:
+        Also note, like the C<--classes> option, any tables contain objects
+        whose class is a parent of the class of objects in your specified
+        tables will also be included. For example, the following:
 
-    convertdb --mode migrate --table comment
+            convertdb --mode migrate --table comment
 
-...is exactly the same as this:
+        ...is exactly the same as this:
 
-    convertdb --mode migrate --tables blog,entry,comment
+            convertdb --mode migrate --tables blog,entry,comment
 
-This is because MT::Comment objects are children of MT::Entry/MT::Page objects which themselves are
-children of MT::Blog objects. For reasons of data integrity, there is no way to transfer an object
-without its parent object.),
-    order => 15,
+        This is because MT::Comment objects are children of
+        MT::Entry/MT::Page objects which themselves are children of MT::Blog
+        objects. For reasons of data integrity, there is no way to transfer an
+        object without its parent object.
+    )),
 );
 
 option skip_tables => (
@@ -156,57 +190,70 @@ option skip_tables => (
     format    => 's@',
     autosplit => ',',
     default   => sub { [] },
-    doc =>
-        'Tables to skip (omit "mt_" prefix: log). Can be comma-delimited or specified multiple times',
-    long_doc =>
-        q(Use this to specify one or more tables to exclude during execution of the specified mode. See the inverse option C<--tables> for its value syntax.
+    order     => 20,
+    doc(q(
+        Tables to skip (omit "mt_" prefix: log). Can be comma-delimited or
+        specified multiple times
+    )),
+    long_doc(q(
+        Use this to specify one or more tables to exclude during execution of
+        the specified mode. See the inverse option C<--tables> for its value
+        syntax.
 
-It operates in a similar manner to C<--skip_classes> but is often shorter and more likely what you want.
-For example, the following skips the entire mt_log table:
+        It operates in a similar manner to C<--skip_classes> but is often
+        shorter and more likely what you want. For example, the following skips
+        the entire mt_log table:
 
-    --skip-table log
+            --skip-table log
 
-Unless you need to preserve your Activity Log records or are using the C<--classes> or C<--tables>
-option, it is recommended to use this option to skip the usually large C<mt_log> table, especially under
-B<migrate> or B<verify> modes:
+        Unless you need to preserve your Activity Log records or are using the
+        C<--classes> or C<--tables> option, it is recommended to use this option
+        to skip the usually large C<mt_log> table, especially under B<migrate>
+        or B<verify> modes:
 
-    --mode migrate --skip-table log
-    --mode verify --skip-table log
-    --mode showcounts --skip-table log
+            --mode migrate --skip-table log
+            --mode verify --skip-table log
+            --mode showcounts --skip-table log
 
-This option is ignored if either C<--tables> or C<--classes> options are specified.),
-    order => 20,
+        This option is ignored if either C<--tables> or C<--classes>
+        options are specified.
+    )),
 );
 
 option no_verify => (
-    is  => 'ro',
-    doc => '[WITH MODE: migrate] Skip data verification during migration.',
-    long_doc =>
-        q([B<migrate MODE ONLY>] This option skips the content and encoding verification for each object migrated
-to the source database. This is useful if you want to quickly perform a migration and are confident of
-the process or plan on verifying later.),
-    default => 0,
-    order   => 35,
+    is       => 'ro',
+    default  => 0,
+    order    => 35,
+    doc      => '[WITH MODE: migrate] Skip data verification during migration.',
+    long_doc(q(
+        [B<migrate MODE ONLY>] This option skips the content and encoding
+        verification for each object migrated to the source database. This is
+        useful if you want to quickly perform a migration and are confident of
+        the process or plan on verifying later.
+    )),
 );
 
 option migrate_unknown => (
     is  => 'rw',
-    doc => '[WITH MODE: checkmeta] Migrate all unknown metadata.',
-    long_doc =>
-        q([B<checkmeta MODE ONLY>] This option cause all metadata records with
-unregistered field types to be migrated. This step now occurs during migrate
-mode so there should be no need to run it separately.'),
     default => 0,
     order   => 40,
+    doc => '[WITH MODE: checkmeta] Migrate all unknown metadata.',
+    long_doc(q(
+        [B<checkmeta MODE ONLY>] This option cause all metadata records with
+        unregistered field types to be migrated. This step now occurs during
+        migrate mode so there should be no need to run it separately.
+    )),
 );
 
 option remove_orphans => (
-    is  => 'ro',
-    doc => '[WITH MODE: checkmeta] Remove found orphans.',
-    long_doc =>
-        q([B<checkmeta MODE ONLY>] This removes all metadata records from the source database which are associated with a non-existent object.),
-    default => 0,
-    order   => 45,
+    is       => 'ro',
+    default  => 0,
+    order    => 45,
+    doc      => '[WITH MODE: checkmeta] Remove found orphans.',
+    long_doc(q(
+        [B<checkmeta MODE ONLY>] This removes all metadata records from the
+        source database which are associated with a non-existent object.
+    )),
 );
 
 option remove_obsolete => (
@@ -889,6 +936,22 @@ around options_man => sub {
 
     exit(0);
 };
+
+sub doc      { return ( doc      => wrap(@_) ) }
+sub long_doc { return ( long_doc => wrap(@_) ) }
+
+sub wrap {
+    my $str =  shift;
+    $str    =~ s{(\A *\n|\n +\Z)}{}gsm;
+    my $indentation_type
+        = Text::FindIndent->parse(\$str, first_level_indent_only => 1);
+    if ($indentation_type =~ /^s(\d+)/) {
+        my $indent = ' 'x$1;
+        $str       =~ s{^$indent}{}gsm;
+    }
+    else { warn "Bad indentation type ($indentation_type): $str" }
+    return $str;
+}
 
 1;
 
