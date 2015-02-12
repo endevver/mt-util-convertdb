@@ -218,7 +218,6 @@ package MT::ConvertDB::Role::DefaultSave {
     }
 }
 
-
 package MT::ConvertDB::ClassMgr::Generic {
     use MT::ConvertDB::ToolSet;
     use List::Util qw( reduce );

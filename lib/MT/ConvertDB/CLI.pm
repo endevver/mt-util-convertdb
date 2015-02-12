@@ -93,11 +93,11 @@ option old_config => (
 );
 
 option classes => (
-    is        => 'ro',
-    format    => 's@',
-    autosplit => ',',
-    default   => sub { [] },
-    order     => 25,
+    is         => 'ro',
+    format     => 's@',
+    autosplit  => ',',
+    default    => sub { [] },
+    order      => 25,
     doc(q(
         Classes to include (e.g. MT::Blog). Can be comma-delimited
         or specified multiple times
@@ -659,7 +659,7 @@ sub verify_migration {
     ###l4p $l4p->debug('Reloading record from new DB for comparison');
     my $cfgmgr = $self->cfgmgr;
     my $newobj = try { $cfgmgr->newdb->load_object( $classobj, $obj ) }
-    catch { $l4p->error( $_, l4mtdump( $obj->properties ) ) };
+               catch { $l4p->error( $_, l4mtdump( $obj->properties ) ) };
 
     my $newmeta = $cfgmgr->newdb->load_meta( $classobj, $newobj );
 

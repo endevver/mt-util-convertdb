@@ -24,10 +24,10 @@ ToolSet->export(
     'Try::Tiny'            => undef,
     'Data::Printer'        => undef,
     'Path::Tiny'           => undef,
-    'MT::Logger::Log4perl' => [qw( l4mtdump get_logger :resurrect )],
     'Moo'                  => undef,
     'Sub::Quote'           => 'quote_sub',
     'Module::Runtime'      => [qw( use_module use_package_optimistically )],
+    'MT::Logger::Log4perl' => [qw( l4mtdump get_logger :resurrect )],
 );
 
 1;
