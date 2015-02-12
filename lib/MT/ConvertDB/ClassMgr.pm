@@ -18,6 +18,11 @@ package MT::ConvertDB::ClassMgr {
         predicate => 1,
     );
 
+    has no_parents => (
+        is      => 'ro',
+        default => 0,
+    );
+
     has class_hierarchy => ( is => 'lazy', );
 
     has object_classes => (
@@ -100,12 +105,17 @@ package MT::ConvertDB::ClassMgr {
         return if $class_objects_generated{$class}++;
         ###l4p $l4p->debug("Generating class object for $class");
 
-        my $class_hierarchy = $self->class_hierarchy;
+        if ( $self->no_parents ) {
+            return $self->class_object($class);
+        }
+        else {
+            my $class_hierarchy = $self->class_hierarchy;
 
-        my @parents = map { $self->_mk_class_objects($_) }
-            @{ $class_hierarchy->{$class}{parents} };
+            my @parents = map { $self->_mk_class_objects($_) }
+                @{ $class_hierarchy->{$class}{parents} };
 
-        return ( @parents, $self->class_object($class) );
+            return ( @parents, $self->class_object($class) );
+        }
     }
 
     sub class_object {

@@ -3,6 +3,11 @@ package MT::ConvertDB::ConfigMgr;
 use MT::ConvertDB::ToolSet;
 use vars qw( $l4p );
 
+has check_schema => (
+    is      => 'ro',
+    default => 1,
+);
+
 has read_only => (
     is       => 'rw',
     required => 1,
@@ -41,7 +46,7 @@ sub BUILD {
     $self->_trigger_read_only( $self->read_only );
 
     for my $db ( $self->olddb, $self->newdb ) {
-        $db->check_schema();
+        $db->check_schema() if $self->check_schema;
         my $mt = MT->instance;
         $mt->run_callbacks( 'init_app', $mt );
         $db->check_plugins();
@@ -60,22 +65,26 @@ sub BUILD {
 sub post_migrate_class { shift->newdb->post_migrate_class(shift) }
 
 sub post_migrate {
-    my $self     = shift;
-    my $classobj = shift;
-
- # Re-load and re-save all blogs/websites to ensure all custom fields migrated
+    my $self = shift;
+    my ( $classobj, $only_tables ) = @_;
     ###l4p $l4p ||= get_logger();
-    ###l4p $l4p->info('Reloading and resaving all blogs/websites to get full metadata');
-    my @cobjs
-        = map { $classobj->class_object($_) } qw( MT::Blog MT::Website );
-    foreach my $cobj (@cobjs) {
-        my $iter = $self->olddb->load_iter($cobj);
-        while ( my $obj = $iter->() ) {
-            my $meta = $self->olddb->load_meta( $cobj, $obj );
-            $self->newdb->save( $cobj, $obj, $meta );
-            $self->use_old_database();
+
+    unless ( @$only_tables ) {  # only_tables is exclusive
+        # Re-load and re-save all blogs/websites to ensure all custom fields
+        # migrated
+        ###l4p $l4p->info('Reloading and resaving all blogs/websites to get full metadata');
+        my @cobjs
+            = map { $classobj->class_object($_) } qw( MT::Blog MT::Website );
+        foreach my $cobj (@cobjs) {
+            my $iter = $self->olddb->load_iter($cobj);
+            while ( my $obj = $iter->() ) {
+                my $meta = $self->olddb->load_meta( $cobj, $obj );
+                $self->newdb->save( $cobj, $obj, $meta );
+                $self->use_old_database();
+            }
         }
     }
+
     $self->use_new_database();
     MT->instance->{cfg}->SchemaVersion( MT->schema_version(), 1 );
     MT->instance->{cfg}->save_config();

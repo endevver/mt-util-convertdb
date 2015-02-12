@@ -220,6 +220,26 @@ option skip_tables => (
     )),
 );
 
+option only_tables => (
+    is        => 'ro',
+    format    => 's@',
+    autosplit => ',',
+    default   => sub { [] },
+    order     => 22,
+    doc(q(
+        Like C<--tables> but exclusively migrates the specified tables without
+        parent object tables. Used for parallel execution.
+    )),
+    long_doc(q(
+        This option is exactly like the C<--tables> option except that does not
+        silently pre-migrate the parent object's tables.  This allows you to
+        run the utility in parallel against different sets of one or more
+        tables without truncating and re-migrating common parent object tables.
+        This is useful (perhaps necessary) in order to more quickly migrate a
+        very large database.
+    )),
+);
+
 option no_verify => (
     is       => 'ro',
     default  => 0,
@@ -308,7 +328,11 @@ has table_counts => (
 sub _build_classmgr {
     my $self  = shift;
     my %param = ();
-    if ( @{ $self->classes } || @{ $self->tables } ) {
+    if ( @{ $self->only_tables } ) {
+        $param{include_tables} = $self->only_tables;
+        $param{no_parents}     = 1;
+    }
+    elsif ( @{ $self->classes } || @{ $self->tables } ) {
         $param{include_classes} = $self->classes if @{ $self->classes };
         $param{include_tables}  = $self->tables  if @{ $self->tables };
     }
@@ -325,9 +349,10 @@ sub _build_cfgmgr {
     my $self = shift;
     ###l4p $l4p ||= get_logger();
     my %param = (
-        read_only => ( $self->dry_run ? 1 : 0 ),
-        new       => $self->new_config,
-        old       => $self->old_config,
+        check_schema => ( $self->only_tables ? 0 : 1 ),
+        read_only    => ( $self->dry_run     ? 1 : 0 ),
+        new          => $self->new_config,
+        old          => $self->old_config,
     );
     use_module('MT::ConvertDB::ConfigMgr')->new(%param);
 }
@@ -617,7 +642,8 @@ sub do_migrate_verify {
 
         $cfgmgr->post_migrate_class($classobj) unless $self->dry_run;
     }
-    $cfgmgr->post_migrate($classmgr) unless $self->dry_run;
+
+    $cfgmgr->post_migrate($classmgr, $self->only_tables) unless $self->dry_run;
     $self->progress("Processing of ALL OBJECTS complete.");
 
     $self->verify_record_counts()
