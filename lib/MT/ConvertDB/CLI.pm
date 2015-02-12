@@ -548,6 +548,37 @@ sub do_check_meta {
     }
 }
 
+BEGIN {
+    use MT ();
+    my $plugin_id_exclude = qr/^(ajaxrating|genentechthemepack|gamify|multiblog|reblog|bob|assetimagequality|Loupe|facebookcommenters|formattedtext|imagecropper|messaging|photoassetfromentry|previewshare|userblogassociation)$/;
+    my $add_cb = \&MT::add_callback;
+    *MT::add_callback = sub {
+        my $class = shift;
+        my ( $meth, $priority, $plugin, $code ) = @_;
+        my $plugin_id = ($plugin && $plugin->id ? $plugin->id : ($plugin||''));
+
+        if ( ref($plugin) && ( defined $MT::mt_inst ) && ( $plugin == $MT::mt_inst ) ) {
+	    return if $meth =~ m/^(post_save|post_remove)$/
+        }
+	else {
+            return if $plugin_id =~ $plugin_id_exclude;
+	}
+
+        my $cb = $class->$add_cb(@_);
+        printf STDERR "INIT CB: %-5s %-30s %-40s %s\n", $cb->{internal}, $plugin_id, $cb->name, $code if $code;  #JAY
+        $cb;
+    };
+
+    my $run_cb = \&MT::run_callback;
+    *MT::run_callback = sub {
+        my $class = shift;
+        my ( $cb, @args ) = @_;
+        printf STDERR "RUN CB: %-5s %-30s %-40s %s\n", $cb->{internal}, ($cb->plugin && $cb->plugin->id ? $cb->plugin->id : ''), $cb->name, $cb->{code};  #JAY
+        $class->$run_cb(@_);
+    };
+}
+
+
 sub do_test {
     my $self       = shift;
     my $cfgmgr     = $self->cfgmgr;
