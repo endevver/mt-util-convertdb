@@ -410,6 +410,15 @@ sub run {
     my $class_objs = $self->class_objects;
     ###l4p $l4p ||= get_logger();
 
+    if ( $self->only_tables ) {
+        my ( $filelog, $errlog ) = map {
+                $Log::Log4perl::Logger::APPENDER_BY_NAME{$_}
+            } qw( File Errorlog );
+        $l4p->info('Raising file logger threshold to WARN');
+        $filelog->threshold('WARN');
+        $errlog->threshold('DEBUG');
+    }
+
     $self->dry_run(1) unless $self->mode eq 'migrate';
 
     try {
