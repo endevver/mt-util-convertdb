@@ -659,10 +659,13 @@ sub do_migrate_verify {
 
         $self->do_check_meta( [$classobj] );
 
-        $cfgmgr->post_migrate_class($classobj) unless $self->dry_run;
+        $cfgmgr->post_migrate_class($classobj)
+            if $self->mode eq 'migrate' and ! $self->dry_run;
     }
 
-    $cfgmgr->post_migrate($classmgr, $self->only_tables) unless $self->dry_run;
+    $cfgmgr->post_migrate($classmgr, $self->only_tables)
+        if $self->mode eq 'migrate' and ! $self->dry_run;
+
     $self->progress("Processing of ALL OBJECTS complete.");
 
     $self->verify_record_counts()
