@@ -622,7 +622,7 @@ sub do_migrate_verify {
     if ( $self->mode eq 'migrate' ) {
         ###l4p $l4p->info( "Truncating all tables in destination database" );
         $self->migrate_unknown(1);
-        $cfgmgr->newdb->remove_all($_) foreach @$class_objs;
+        # $cfgmgr->newdb->remove_all($_) foreach @$class_objs;
         $self->do_table_counts();
     }
 
