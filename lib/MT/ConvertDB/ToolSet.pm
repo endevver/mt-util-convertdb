@@ -23,6 +23,7 @@ ToolSet->export(
          # 'Scalar::Util'         => 'blessed',   # or a specific list
     'Try::Tiny'            => undef,
     'Data::Printer'        => undef,
+    'Scalar::Util'         => 'blessed',
     'Path::Tiny'           => undef,
     'Moo'                  => undef,
     'Sub::Quote'           => 'quote_sub',
