@@ -22,7 +22,6 @@ BEGIN {
         next unless grep { $label eq $_ } @POD_EXTRACT;
         $MooXOptions{$label} = $head1->content;
     }
-
     # $MooXOptions{flavour} = [qw( pass_through )];
 }
 use MooX::Options (%MooXOptions);
@@ -248,6 +247,13 @@ option only_tables => (
         This is useful (perhaps necessary) in order to more quickly migrate a
         very large database.
     )),
+);
+
+option clear_tables => (
+    is      => 'ro',
+    default => 0,
+    order   => 32,
+    doc     => '[WITH MODE: migrate] Delete all rows from the target database before migrating',
 );
 
 option no_verify => (
@@ -620,9 +626,11 @@ sub do_migrate_verify {
     ###l4p $l4p ||= get_logger();
 
     if ( $self->mode eq 'migrate' ) {
-        ###l4p $l4p->info( "Truncating all tables in destination database" );
         $self->migrate_unknown(1);
-        # $cfgmgr->newdb->remove_all($_) foreach @$class_objs;
+        if ( $self->clear_tables ) {
+            ##l4p $l4p->info( "Truncating all tables in destination database" );
+            $cfgmgr->newdb->remove_all($_) foreach @$class_objs;
+        }
         $self->do_table_counts();
     }
 
