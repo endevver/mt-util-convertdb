@@ -277,23 +277,17 @@ package MT::ConvertDB::ClassMgr::Generic {
     sub _build_mpkg {
         my $self  = shift;
         my $class = $self->class;
-        my @isa   = try { no strict 'refs'; @{ $class . '::ISA' } };
-        return unless grep { $_ eq 'MT::Object' } @isa;
-
-        require MT::Meta;
-        return MT::Meta->has_own_metadata_of($class)
-            ? $class->meta_pkg
-            : undef;
+        return try { $class->properties->{meta} ? $class->meta_pkg : ''} || '';
     }
 
     sub _build_mds {
         my $self = shift;
-        try { $self->mpkg->datasource };
+        try { $self->mpkg->datasource } catch { '' };
     }
 
     sub _build_mtable {
         my $self = shift;
-        return $self->mds ? 'mt_' . ( $self->mds ) : undef;
+        return $self->mds ? 'mt_' . ( $self->mds ) : '';
     }
 
     sub _build_metacolumns {
@@ -314,7 +308,7 @@ package MT::ConvertDB::ClassMgr::Generic {
         my $self  = shift;
         my $class = $self->class;
         undef $class->properties->{driver};
-        try { undef $class->meta_pkg->properties->{driver} };
+        try { undef $self->mpkg->properties->{driver} if $self->mpkg }
     }
 
     sub count {
