@@ -571,6 +571,111 @@ sub do_test {
     my $classmgr   = $self->classmgr;
     my $class_objs = $self->class_objects;
     ###l4p $l4p ||= get_logger();
+    require MT::Meta;
+
+    my $count       = 0;
+    my $next_update = $self->progressbar->update(0);
+
+    my %seen;
+        printf "\n%-30s %-30s %-10s %-10s %s\n", qw(class mpkg ds mds mtable);
+    foreach my $classobj (@$class_objs) {
+        my $class  = $classobj->class || '';
+        my $mpkg   = $classobj->mpkg || '';
+        my $ds     = $classobj->ds || '';
+        my $mds    = $classobj->mds || '';
+        my $mtable = $classobj->mtable || '';
+        my @isa    = try { no strict 'refs'; @{ $class . '::ISA' } };
+        printf "\n%-30s %-30s %-10s %-10s %s\n", $class, $mpkg, $ds, $mds, $mtable;
+
+
+        # ( $class ne MT->model($class->datasource) ? 0 : 1);
+
+        next if ! $classobj->mtable
+             || ( $class ne MT->model($class->datasource) )
+             || $seen{$classobj->mtable};
+             warn "HERE WE GO with $class";
+$seen{$classobj->mtable}++;
+        next;
+        # Reset object drivers for class and metaclass
+        $cfgmgr->use_old_database;
+        $classobj->reset_object_drivers();
+
+        next unless MT::Meta->has_own_metadata_of($class);
+
+        # $arg->{dbh} = $arg->{mpkg}->driver->rw_handle;
+        # local $arg->{dbh}{RaiseError}       = 1;
+        # local $arg->{dbh}{FetchHashKeyName} = 'NAME_lc';    # lc($colnames)
+
+        $self->progress("Force migrating $class metadata");
+        ###l4p $l4p->debug("Force migrating $class meta fields");
+
+        require SQL::Abstract;
+        my $sql = SQL::Abstract->new();
+
+        # Reset object drivers for class and metaclass
+        my $olddb        = $classobj->mpkg->driver;
+        say STDERR "olddb";
+        p($olddb);
+
+        my $olddbh       = $olddb->rw_handle;
+        say STDERR "olddb handle";
+        p($olddbh);
+
+        $self->cfgmgr->use_new_database;
+        $classobj->reset_object_drivers();
+        my $newdb        = $classobj->mpkg->driver;
+        say STDERR "newdb";
+        p($newdb);
+
+        my $newdbh       = $newdb->rw_handle;
+        say STDERR "newdb handle";
+        p($newdbh);
+
+    #     my $mtable       = $classobj->mtable;
+    #     my $mcols        = $classobj->metacolumns;
+    #     my $rows_deleted = $newdbh->do(qq{ DELETE FROM $mtable })
+    #         or die $newdbh->errstr;
+    #     ###l4p $l4p->info("Deleted $rows_deleted rows from the new DB $mtable table");
+    #
+    #     $self->cfgmgr->use_old_database;
+    #
+    #     my ( $select, @sbind )
+    #         = $sql->select( $mtable, ['*'] );
+    #     ###l4p $l4p->debug( $select.' ', l4mtdump(@sbind) );
+    #
+    #     my ( $insert, $isth );
+    #     my $ssth = $olddbh->prepare($select)
+    #         or die $olddbh->errstr;
+    #
+    #     $ssth->execute(@sbind) or die $olddbh->errstr;
+    #
+    #     while ( my $d = $ssth->fetchrow_hashref ) {
+    #         $insert ||= $sql->insert( $mtable, $d );
+    #         $isth ||= $newdbh->prepare($insert) or die $newdbh->errstr;
+    #         try {
+    #             $isth->execute( $sql->values($d) )
+    #                 or die $isth->errstr;
+    #             ##l4p $l4p->debug( $insert.' '.p($sql->values($d)));
+    #         }
+    #         catch {
+    #             $l4p->warn( "Insert error: $_" );
+    #             $l4p->warn( $insert.' '.p($sql->values($d)));
+    #         };
+    #
+    #         $count++;
+    #         $next_update = $self->progressbar->update($count)
+    #             if $count >= $next_update;    # efficiency
+    #     }
+    #
+    #     $self->progress($classobj->mds . ' records migrated');
+    #
+    #
+    #     $self->cfgmgr->use_old_database;
+    }
+    $self->progress('All specified meta records migrated');
+    $self->progressbar->update( $self->total_objects );
+}
+
 sub do_force_meta {
     my $self       = shift;
     my $cfgmgr     = $self->cfgmgr;
