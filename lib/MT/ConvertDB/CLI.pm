@@ -45,6 +45,7 @@ has mode_handlers => (
             resavesource => 'do_resave_source',
             migrate      => 'do_migrate_verify',
             verify       => 'do_migrate_verify',
+            forcemeta    => 'do_force_meta',
             test         => 'do_test',
             fullmigrate  => 'do_full_migrate_verify'
         };
@@ -570,6 +571,85 @@ sub do_test {
     my $classmgr   = $self->classmgr;
     my $class_objs = $self->class_objects;
     ###l4p $l4p ||= get_logger();
+sub do_force_meta {
+    my $self       = shift;
+    my $cfgmgr     = $self->cfgmgr;
+    my $classmgr   = $self->classmgr;
+    my $class_objs = $self->class_objects;
+    ###l4p $l4p ||= get_logger();
+    require MT::Meta;
+    require SQL::Abstract;
+
+    my $count       = 0;
+    my $next_update = $self->progressbar->update(0);
+
+    ###l4p $self->progress('Force migrating '.$self->total_objects.' record.');
+    foreach my $classobj (@$class_objs) {
+        my $class = $classobj->class;
+        # my @isa = try { no strict 'refs'; @{ $class . '::ISA' } };
+        # next unless $class->isa('MT::Object'); # grep { $_ eq 'MT::Object' } @isa;
+        my $ds     = $classobj->ds;
+        next unless $class eq MT->model($ds);
+
+        my $mtable = $classobj->mtable or next;
+        my $mcols  = $classobj->metacolumns;
+
+        $self->progress("Force migrating $class metadata");
+
+        # Reset object drivers for class and metaclass
+        $cfgmgr->use_old_database;
+        $classobj->reset_object_drivers();
+        my $olddb  = $classobj->mpkg->driver;
+        my $olddbh = $olddb->rw_handle;
+
+        $self->cfgmgr->use_new_database;
+        $classobj->reset_object_drivers();
+        my $newdb        = $classobj->mpkg->driver;
+        my $newdbh       = $newdb->rw_handle;
+
+        # next unless MT::Meta->has_own_metadata_of($class);
+
+        ###l4p $l4p->debug("Force migrating $class meta fields");
+
+        my $rows_deleted = $newdbh->do(qq{ DELETE FROM $mtable })
+            or die $newdbh->errstr;
+        ###l4p $l4p->info("Deleted $rows_deleted rows from the new DB $mtable table");
+
+        $self->cfgmgr->use_old_database;
+
+        my $sql                = SQL::Abstract->new();
+        my ( $select, @sbind ) = $sql->select( $mtable, ['*'] );
+        ###l4p $l4p->debug( $select.' ', l4mtdump(@sbind) );
+
+        my $ssth = $olddbh->prepare($select) or die $olddbh->errstr;
+
+        $ssth->execute(@sbind) or die $olddbh->errstr;
+
+        while ( my $d = $ssth->fetchrow_hashref ) {
+            my $insert = $sql->insert( $mtable, $d );
+            my $isth = $newdbh->prepare($insert) or die $newdbh->errstr;
+            try {
+                $isth->execute( $sql->values($d) )
+                    or die $isth->errstr;
+                ##l4p $l4p->debug( $insert.' '.p($sql->values($d)));
+            }
+            catch {
+                $l4p->warn( "Insert error: $_" );
+                $l4p->warn( $insert.' '.p($sql->values($d)));
+            };
+
+            $count++;
+            $next_update = $self->progressbar->update($count)
+                if $count >= $next_update;    # efficiency
+        }
+
+        $self->progress($classobj->mds . ' records migrated');
+
+
+        $self->cfgmgr->use_old_database;
+    }
+    $self->progress('All specified meta records migrated');
+    $self->progressbar->update( $self->total_objects );
 }
 
 sub do_resave_source {
